@@ -2,7 +2,7 @@ import type { QlooEntity } from "@/lib/qloo/types";
 import {
   isSamePerson,
   pickHeadliner,
-  rankHeadlinerCandidates,
+  rankAlternateHeadliners,
 } from "./artist-filter";
 import { openerPopularityMax, pickOpener } from "./opener-select";
 import {
@@ -147,10 +147,11 @@ export async function buildLineup(input: LineupRequest): Promise<LineupResult> {
   const excludeFromAlternates = [headlinerEntity];
   if (openerEntity) excludeFromAlternates.push(openerEntity);
 
-  const alternates = rankHeadlinerCandidates(
+  const alternates = rankAlternateHeadliners(
     headlinerCandidates,
     signals.musicTagIds,
     band,
+    headlinerEntity,
     excludeFromAlternates,
   )
     .filter(

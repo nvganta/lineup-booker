@@ -10,6 +10,7 @@ export function normalizeArtistName(name: string): string {
     .trim();
 }
 
+/** Collapse short vs long artist name variants for deduping. */
 export function artistNameKey(name: string): string {
   const parts = normalizeArtistName(name).split(/\s+/).filter(Boolean);
   if (parts.length >= 2) {
@@ -110,6 +111,30 @@ const BLOCKLIST_NAME_PATTERNS =
 
 const AGGRESSIVE_GENRE =
   /genre:music:(metal|heavy_metal|thrash|death_metal|black_metal|power_metal|glam_metal|speed_metal|hard_rock|arena_rock)/;
+
+const QLOO_OBSCURITY_TAG = /urn:tag:obscurity:qloo:(\d+)/;
+
+/** Lower values mean wider mainstream recognition in Qloo's obscurity scale. */
+export function qlooObscurityLevel(entity: QlooEntity): number | null {
+  for (const id of entityTagIds(entity)) {
+    const match = id.match(QLOO_OBSCURITY_TAG);
+    if (match) return Number(match[1]);
+  }
+  const scale = entity.properties?.obscurity_scale;
+  if (typeof scale === "number" && Number.isFinite(scale)) return scale;
+  return null;
+}
+
+function isTooFamousForSmallRoom(
+  entity: QlooEntity,
+  band?: PopularityBand,
+): boolean {
+  const seatCap = band?.seatCapacity;
+  if (seatCap === undefined || seatCap > 300) return false;
+  const obscurity = qlooObscurityLevel(entity);
+  if (obscurity === null) return false;
+  return obscurity <= 2;
+}
 
 function requestWantsAggressive(genreTagIds: string[]): boolean {
   return genreTagIds.some((id) => AGGRESSIVE_GENRE.test(id));
@@ -228,10 +253,30 @@ export function isLikelyArenaActForSmallRoom(
   genreTagIds: string[],
 ): boolean {
   if (!band?.headlinerMax || band.headlinerMax > 0.88) return false;
+  if (isTooFamousForSmallRoom(entity, band)) return true;
   const pop = entity.popularity ?? 0;
   if (pop > band.headlinerMax) return true;
   if (pop < 0.9) return false;
   return !meaningfulGenreOverlap(entity, genreTagIds);
+}
+
+function eligibleAsAlternate(
+  entity: QlooEntity,
+  band: PopularityBand | undefined,
+  headliner: QlooEntity,
+): boolean {
+  if (!band) return true;
+
+  if (isTooFamousForSmallRoom(entity, band)) return false;
+
+  const pop = entity.popularity ?? 0;
+  const headlinerPop = headliner.popularity ?? 0;
+  const seatCap = band.seatCapacity;
+  if (seatCap !== undefined && seatCap <= 200) {
+    if (pop > headlinerPop + 0.05) return false;
+  }
+
+  return true;
 }
 
 function eligibleForVenueHeadlinerBand(
@@ -302,6 +347,18 @@ export function rankHeadlinerCandidates(
 ): QlooEntity[] {
   return rankHeadlinerPool(entities, genreTagIds, band, exclude).filter((e) =>
     eligibleForVenueHeadlinerBand(e, band),
+  );
+}
+
+export function rankAlternateHeadliners(
+  entities: QlooEntity[],
+  genreTagIds: string[],
+  band: PopularityBand | undefined,
+  headliner: QlooEntity,
+  exclude: QlooEntity[] = [],
+): QlooEntity[] {
+  return rankHeadlinerCandidates(entities, genreTagIds, band, exclude).filter(
+    (entity) => eligibleAsAlternate(entity, band, headliner),
   );
 }
 

@@ -13,6 +13,7 @@ export type QlooEntity = {
     discography?: unknown;
     albums?: unknown;
     album_count?: number;
+    obscurity_scale?: number;
   };
   tags?: Array<{ id?: string; name?: string; type?: string }>;
   query?: {

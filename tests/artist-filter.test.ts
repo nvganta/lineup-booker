@@ -6,7 +6,9 @@ import {
   isMusicArtist,
   isPersonOnlyEntity,
   meaningfulGenreOverlap,
+  qlooObscurityLevel,
   pickHeadliner,
+  rankAlternateHeadliners,
   rankHeadlinerCandidates,
 } from "@/lib/lineup/artist-filter";
 import { popularityBandFromConcept } from "@/lib/lineup/tiers";
@@ -204,5 +206,111 @@ describe("pickHeadliner popularity and genre overlap", () => {
       0.95,
     );
     expect(rankHeadlinerCandidates([bigAct], BAR_TAGS, band)).toHaveLength(0);
+  });
+
+  it("drops low-obscurity alternates for rooms up to 300 seats", () => {
+    const band = popularityBandFromConcept("150 capacity room");
+    const headliner: QlooEntity = {
+      name: "Fixture Room Headliner",
+      subtype: "urn:entity:artist",
+      popularity: 0.757,
+      tags: [
+        { id: "urn:tag:genre:music:indie_rock" },
+        { id: "urn:tag:obscurity:qloo:4" },
+      ],
+    };
+    const mainstreamAlternate: QlooEntity = {
+      name: "Fixture Mainstream Alternate",
+      subtype: "urn:entity:artist",
+      popularity: 0.781,
+      tags: [
+        { id: "urn:tag:genre:music:indie_rock" },
+        { id: "urn:tag:obscurity:qloo:2" },
+      ],
+    };
+    expect(qlooObscurityLevel(mainstreamAlternate)).toBe(2);
+    expect(
+      rankAlternateHeadliners(
+        [mainstreamAlternate],
+        INDIE_TAGS,
+        band,
+        headliner,
+        [headliner],
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("keeps higher-obscurity alternates for small rooms", () => {
+    const band = popularityBandFromConcept("150 capacity room");
+    const headliner: QlooEntity = {
+      name: "Fixture Room Headliner",
+      subtype: "urn:entity:artist",
+      popularity: 0.75,
+      tags: [{ id: "urn:tag:genre:music:indie_rock" }],
+    };
+    const indieAlternate: QlooEntity = {
+      name: "Fixture Indie Alternate",
+      subtype: "urn:entity:artist",
+      popularity: 0.72,
+      tags: [
+        { id: "urn:tag:genre:music:indie_rock" },
+        { id: "urn:tag:obscurity:qloo:4" },
+      ],
+    };
+    expect(
+      rankAlternateHeadliners(
+        [indieAlternate],
+        INDIE_TAGS,
+        band,
+        headliner,
+        [headliner],
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("skips low-obscurity headliners for rooms up to 300 seats", () => {
+    const band = popularityBandFromConcept("250 capacity room");
+    const mainstream: QlooEntity = {
+      name: "Fixture Mainstream Headliner",
+      subtype: "urn:entity:artist",
+      popularity: 0.78,
+      tags: [
+        { id: "urn:tag:genre:music:indie_rock" },
+        { id: "urn:tag:obscurity:qloo:2" },
+      ],
+    };
+    const local: QlooEntity = {
+      name: "Fixture Local Headliner",
+      subtype: "urn:entity:artist",
+      popularity: 0.76,
+      tags: [
+        { id: "urn:tag:genre:music:indie_rock" },
+        { id: "urn:tag:obscurity:qloo:4" },
+      ],
+    };
+    expect(pickHeadliner([mainstream, local], INDIE_TAGS, band)?.name).toBe(
+      "Fixture Local Headliner",
+    );
+  });
+
+  it("drops alternates above popularity cap when obscurity tag is missing", () => {
+    const band = popularityBandFromConcept("300 capacity room");
+    const headliner: QlooEntity = {
+      name: "Fixture Room Headliner",
+      subtype: "urn:entity:artist",
+      popularity: 0.8,
+      tags: [{ id: "urn:tag:genre:music:electronic" }],
+    };
+    const tooPopular = qlooShapedArtist(
+      "Fixture Too Popular Act",
+      ["urn:tag:genre:music:electronic"],
+      [],
+      0.917,
+    );
+    expect(
+      rankAlternateHeadliners([tooPopular], BAR_TAGS, band, headliner, [
+        headliner,
+      ]),
+    ).toHaveLength(0);
   });
 });
