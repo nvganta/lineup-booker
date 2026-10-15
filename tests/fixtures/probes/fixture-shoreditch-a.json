@@ -1,0 +1,66 @@
+{
+  "venue": {
+    "city": "London",
+    "pin": {
+      "lat": 51.526,
+      "lon": -0.078,
+      "city": "London",
+      "country": "United Kingdom"
+    },
+    "tags": ["electronic", "soul"],
+    "musicTagIds": [
+      "urn:tag:genre:music:electronic",
+      "urn:tag:genre:music:soul"
+    ]
+  },
+  "headliner": {
+    "name": "Fixture Artist Epsilon",
+    "id": "fixture-artist-epsilon-001",
+    "popularity": 0.8
+  },
+  "openerMax": 0.77,
+  "neighborhoods": {
+    "raw": [
+      {
+        "name": "Kent",
+        "affinity": 0.9,
+        "disambiguation": "Kent, England, United Kingdom"
+      },
+      {
+        "name": "Surrey",
+        "affinity": 0.88,
+        "disambiguation": "Surrey, England, United Kingdom"
+      },
+      {
+        "name": "Essex",
+        "affinity": 0.86,
+        "disambiguation": "Essex, England, United Kingdom"
+      },
+      {
+        "name": "England",
+        "affinity": 0.84,
+        "disambiguation": "England, United Kingdom"
+      },
+      {
+        "name": "Greater London",
+        "affinity": 0.82,
+        "disambiguation": "Greater London, England, United Kingdom"
+      },
+      {
+        "name": "Shoreditch",
+        "affinity": 0.95,
+        "disambiguation": "Shoreditch, London, England, United Kingdom"
+      }
+    ],
+    "audit": []
+  },
+  "openers": {
+    "raw": [
+      {
+        "name": "Fixture Opener Zeta",
+        "id": "fixture-opener-zeta-001",
+        "popularity": 0.6
+      }
+    ]
+  }
+}

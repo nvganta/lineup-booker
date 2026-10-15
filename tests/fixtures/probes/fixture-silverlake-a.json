@@ -1,0 +1,62 @@
+{
+  "venue": {
+    "city": "Los Angeles",
+    "pin": {
+      "lat": 34.09,
+      "lon": -118.28,
+      "city": "Los Angeles",
+      "state": "California",
+      "country": "United States",
+      "county": "Los Angeles County"
+    },
+    "tags": ["indie rock", "dream pop"],
+    "musicTagIds": [
+      "urn:tag:genre:music:indie_rock",
+      "urn:tag:genre:music:dream_pop"
+    ]
+  },
+  "headliner": {
+    "name": "Fixture Artist Gamma",
+    "id": "fixture-artist-gamma-001",
+    "popularity": 0.82
+  },
+  "neighborhoods": {
+    "raw": [
+      {
+        "name": "Contiguous United States",
+        "affinity": 0.99,
+        "disambiguation": "Contiguous United States"
+      },
+      {
+        "name": "Southern California",
+        "affinity": 0.95,
+        "disambiguation": "Southern California, United States"
+      },
+      {
+        "name": "California",
+        "affinity": 0.92,
+        "disambiguation": "California, United States"
+      },
+      {
+        "name": "Silver Lake",
+        "affinity": 0.88,
+        "disambiguation": "Silver Lake, Los Angeles, California, United States"
+      },
+      {
+        "name": "Echo Park",
+        "affinity": 0.85,
+        "disambiguation": "Echo Park, Los Angeles, California, United States"
+      }
+    ],
+    "audit": []
+  },
+  "openers": {
+    "raw": [
+      {
+        "name": "Fixture Opener Delta",
+        "id": "fixture-opener-delta-001",
+        "popularity": 0.55
+      }
+    ]
+  }
+}

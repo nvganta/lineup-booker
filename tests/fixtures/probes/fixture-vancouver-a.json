@@ -1,0 +1,102 @@
+{
+  "venue": {
+    "city": "Vancouver",
+    "pin": {
+      "lat": 49.26,
+      "lon": -123.1,
+      "city": "Vancouver",
+      "state": "British Columbia",
+      "country": "Canada",
+      "county": "Metro Vancouver Regional District"
+    },
+    "tags": ["Indie folk", "vinyl nights"],
+    "musicTagIds": [
+      "urn:tag:genre:music:indie_folk",
+      "urn:tag:genre:music:folk"
+    ]
+  },
+  "headliner": {
+    "name": "Fixture Artist Alpha",
+    "id": "fixture-artist-alpha-001",
+    "popularity": 0.71
+  },
+  "neighborhoods": {
+    "raw": [
+      {
+        "name": "Canada",
+        "affinity": 0.95,
+        "disambiguation": "Canada"
+      },
+      {
+        "name": "British Columbia",
+        "affinity": 0.93,
+        "disambiguation": "British Columbia, Canada"
+      },
+      {
+        "name": "Metro Vancouver",
+        "affinity": 0.91,
+        "disambiguation": "Metro Vancouver, British Columbia, Canada"
+      },
+      {
+        "name": "Electoral Area A",
+        "affinity": 0.89,
+        "disambiguation": "Electoral Area A, British Columbia, Canada"
+      },
+      {
+        "name": "Mount Pleasant",
+        "affinity": 0.88,
+        "disambiguation": "Mount Pleasant, Vancouver, British Columbia, Canada"
+      },
+      {
+        "name": "Vancouver",
+        "affinity": 0.78,
+        "disambiguation": "Vancouver, British Columbia, Canada"
+      },
+      {
+        "name": "Strathcona",
+        "affinity": 0.75,
+        "disambiguation": "Strathcona, Vancouver, British Columbia, Canada"
+      }
+    ],
+    "audit": [
+      {
+        "name": "Canada",
+        "affinity": 0.95,
+        "distanceKm": null,
+        "sameCity": false,
+        "kept": false,
+        "reason": "broad admin region"
+      },
+      {
+        "name": "Mount Pleasant",
+        "affinity": 0.88,
+        "distanceKm": 0.19,
+        "sameCity": true,
+        "kept": true,
+        "reason": "within radius and city"
+      },
+      {
+        "name": "Vancouver",
+        "affinity": 0.78,
+        "distanceKm": null,
+        "sameCity": false,
+        "kept": false,
+        "reason": "matches venue city row"
+      }
+    ]
+  },
+  "openers": {
+    "raw": [
+      {
+        "name": "Fixture Artist Alpha Long",
+        "id": "fixture-artist-alpha-long-001",
+        "popularity": 0.65
+      },
+      {
+        "name": "Fixture Opener Beta",
+        "id": "fixture-opener-beta-001",
+        "popularity": 0.66
+      }
+    ]
+  }
+}
