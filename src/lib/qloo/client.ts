@@ -1,4 +1,6 @@
 import { getQlooConfig, QlooApiError, QlooConfigError } from "./config";
+import { getAgentRuntime } from "@/lib/agent/runtime";
+import { mockQlooJsonForUrl } from "./mock-transport";
 import { scheduleQlooRequest } from "./rate-limit";
 import {
   getCachedQlooResponse,
@@ -39,10 +41,22 @@ export async function qlooGet<T>(
   const query = buildSearchParams(params).toString();
   const url = `${baseUrl}${path}${query ? `?${query}` : ""}`;
 
-  const cached = getCachedQlooResponse<T>(url);
+  const cached = await getCachedQlooResponse<T>(url);
   if (cached) {
     return {
       data: cached,
+      request: { method: "GET", path, query },
+    };
+  }
+
+  getAgentRuntime()?.budget.useQloo();
+
+  const mocked = mockQlooJsonForUrl(url);
+  if (mocked != null) {
+    const data = mocked as T;
+    await setCachedQlooResponse(url, data);
+    return {
+      data,
       request: { method: "GET", path, query },
     };
   }
@@ -65,7 +79,7 @@ export async function qlooGet<T>(
 
     if (response.ok) {
       const data = (await response.json()) as T;
-      setCachedQlooResponse(url, data);
+      await setCachedQlooResponse(url, data);
       return {
         data,
         request: { method: "GET", path, query },

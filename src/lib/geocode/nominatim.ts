@@ -126,11 +126,13 @@ export type NominatimAddress = {
   country?: string;
   postcode?: string;
   city_district?: string;
+  borough?: string;
   suburb?: string;
   neighbourhood?: string;
   neighborhood?: string;
   quarter?: string;
   road?: string;
+  house_number?: string;
 };
 
 export type GeocodeResult = {
@@ -144,6 +146,9 @@ export type GeocodeResult = {
   county?: string;
   stateDistrict?: string;
   address?: NominatimAddress;
+  /** Nominatim class/type, e.g. place/suburb or amenity/restaurant. */
+  placeClass?: string;
+  placeType?: string;
 };
 
 export function cityFromAddress(address: NominatimAddress): string | undefined {
@@ -216,6 +221,151 @@ export function parseAddressForGeocode(address: string): ParsedAddress {
 }
 
 /** Ordered free-text attempts for venue address geocoding. */
+const US_STATE_ABBR =
+  /^(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC|BC|ON)$/i;
+
+/** Mid-level place names in a typed address (e.g. Silver Lake), not street or state. */
+export function neighborhoodHintsFromLocation(location: string): string[] {
+  const parts = location.split(",").map((p) => p.trim()).filter(Boolean);
+  const hints: string[] = [];
+  for (const part of parts) {
+    if (/^\d/.test(part)) continue;
+    if (US_STATE_ABBR.test(part)) continue;
+    if (/^(usa|united states|u\.s\.a\.?)$/i.test(part)) continue;
+    if (
+      /\d/.test(part) &&
+      /\b(st|street|ave|avenue|blvd|boulevard|rd|road|dr|drive|way|lane|ln)\b/i.test(
+        part,
+      )
+    ) {
+      continue;
+    }
+    hints.push(part);
+  }
+  return hints;
+}
+
+function houseNumberFromStreet(street?: string): string | undefined {
+  if (!street) return undefined;
+  const m = street.trim().match(/^(\d+[a-z]?)\b/i);
+  return m?.[1]?.toLowerCase();
+}
+
+const STREET_ABBREVIATIONS: Record<string, string> = {
+  st: "street",
+  str: "street",
+  ave: "avenue",
+  av: "avenue",
+  blvd: "boulevard",
+  rd: "road",
+  dr: "drive",
+  ln: "lane",
+  pl: "place",
+  ct: "court",
+  sq: "square",
+  hwy: "highway",
+  pkwy: "parkway",
+  w: "west",
+  e: "east",
+  n: "north",
+  s: "south",
+};
+
+/** "2801 Sunset Blvd" → ["sunset", "boulevard"]; directions are dropped so "W Queen St" matches "Queen Street West". */
+export function streetNameTokens(street?: string): string[] {
+  if (!street) return [];
+  return street
+    .toLowerCase()
+    .replace(/^\s*\d+[a-z]?\b/, "")
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean)
+    .map((t) => STREET_ABBREVIATIONS[t] ?? t)
+    .filter((t) => !["west", "east", "north", "south"].includes(t));
+}
+
+function placeFields(addr: NominatimAddress): string[] {
+  return [
+    addr.neighbourhood,
+    addr.neighborhood,
+    addr.quarter,
+    addr.suburb,
+    addr.city_district,
+    addr.city,
+    addr.town,
+    addr.village,
+  ]
+    .filter((v): v is string => Boolean(v))
+    .map((v) => v.toLowerCase());
+}
+
+/**
+ * Rank Nominatim candidates against what the owner typed. General rules only:
+ * exact house number, same street name, same city, and every typed place hint
+ * (neighbourhood, suburb, borough) that appears in the candidate's address.
+ * Nominatim's own order breaks ties.
+ */
+export function scoreGeocodeResult(
+  result: GeocodeResult,
+  _typedAddress: string,
+  parsed: ParsedAddress,
+  hints: string[],
+  rank = 0,
+): number {
+  let score = 0;
+  const addr = result.address ?? {};
+  const display = result.displayName.toLowerCase();
+
+  const house = houseNumberFromStreet(parsed.street);
+  if (house) {
+    const hitHouse = addr.house_number?.toLowerCase();
+    if (hitHouse === house) score += 120;
+    else if (hitHouse) score -= 30; // a different building on the same street
+  }
+
+  const typedStreet = streetNameTokens(parsed.street);
+  if (typedStreet.length) {
+    const road = new Set(streetNameTokens(addr.road ?? ""));
+    if (road.size && typedStreet.every((t) => road.has(t))) score += 40;
+    else if (road.size) score -= 20;
+  }
+
+  const typedCity = parsed.city?.toLowerCase();
+  const places = placeFields(addr);
+  if (typedCity && places.length) {
+    if (places.includes(typedCity)) score += 90;
+    else if (display.includes(typedCity)) score += 35;
+    else score -= 40;
+  }
+
+  for (const hint of hints) {
+    const h = hint.toLowerCase();
+    if (h.length < 3 || h === typedCity) continue;
+    if (places.includes(h)) score += 70;
+    else if (display.includes(h)) score += 45;
+  }
+
+  return score - rank * 2;
+}
+
+export function pickBestGeocodeResult(
+  candidates: GeocodeResult[],
+  typedAddress: string,
+): GeocodeResult | null {
+  if (candidates.length === 0) return null;
+  const parsed = parseAddressForGeocode(typedAddress);
+  const hints = neighborhoodHintsFromLocation(typedAddress);
+  let best: GeocodeResult | null = null;
+  let bestScore = -Infinity;
+  candidates.forEach((c, rank) => {
+    const s = scoreGeocodeResult(c, typedAddress, parsed, hints, rank);
+    if (s > bestScore) {
+      bestScore = s;
+      best = c;
+    }
+  });
+  return bestScore > 0 ? best : candidates[0] ?? null;
+}
+
 export function geocodeAddressAttempts(address: string): string[] {
   const trimmed = address.trim();
   const stripped = stripTrailingPostcodeToken(trimmed);
@@ -233,6 +383,8 @@ function resultFromHit(hit: {
   lon: string;
   display_name: string;
   address?: NominatimAddress;
+  class?: string;
+  type?: string;
 }): GeocodeResult | null {
   const lat = Number(hit.lat);
   const lon = Number(hit.lon);
@@ -253,6 +405,8 @@ function resultFromHit(hit: {
     county: addr.county,
     stateDistrict: addr.state_district,
     address: addr,
+    placeClass: hit.class,
+    placeType: hit.type,
   };
 }
 
@@ -268,12 +422,16 @@ function cacheSet<T>(key: string, value: T): void {
   writePersistentCache(key, value);
 }
 
-async function nominatimRequest(
+async function nominatimRequestMany(
   params: Record<string, string>,
   cacheKey: string,
-): Promise<NominatimLookupResult<GeocodeResult>> {
-  const cached = cacheGet<GeocodeResult>(cacheKey);
+  limit: number,
+): Promise<NominatimLookupResult<GeocodeResult[]>> {
+  const cached = cacheGet<GeocodeResult[]>(cacheKey);
   if (cached) return { value: cached, fromCache: true };
+
+  const { getAgentRuntime } = await import("@/lib/agent/runtime");
+  getAgentRuntime()?.budget.useNominatim();
 
   const now = Date.now();
   const wait = Math.max(0, MIN_INTERVAL_MS - (now - lastNominatimAt));
@@ -286,7 +444,7 @@ async function nominatimRequest(
   }
   url.searchParams.set("format", "json");
   url.searchParams.set("addressdetails", "1");
-  url.searchParams.set("limit", "1");
+  url.searchParams.set("limit", String(Math.max(1, limit)));
 
   const response = await fetch(url.toString(), {
     headers: { "User-Agent": USER_AGENT },
@@ -302,12 +460,34 @@ async function nominatimRequest(
     address?: NominatimAddress;
   }>;
 
-  const hit = results[0];
-  if (!hit) return { value: null, fromCache: false };
+  const mapped = results
+    .map((hit) => resultFromHit(hit))
+    .filter((r): r is GeocodeResult => r != null);
+  if (mapped.length === 0) return { value: null, fromCache: false };
 
-  const result = resultFromHit(hit);
-  if (result) cacheSet(cacheKey, result);
-  return { value: result, fromCache: false };
+  cacheSet(cacheKey, mapped);
+  return { value: mapped, fromCache: false };
+}
+
+async function nominatimRequest(
+  params: Record<string, string>,
+  cacheKey: string,
+): Promise<NominatimLookupResult<GeocodeResult>> {
+  const cached = cacheGet<GeocodeResult>(cacheKey);
+  if (cached) return { value: cached, fromCache: true };
+  const { value: list } = await nominatimRequestMany(params, `${cacheKey}:list`, 1);
+  const one = list?.[0] ?? null;
+  if (one) cacheSet(cacheKey, one);
+  return { value: one, fromCache: false };
+}
+
+async function nominatimFetchCandidates(
+  query: string,
+  limit: number,
+): Promise<GeocodeResult[]> {
+  const key = `q:${query.trim().toLowerCase()}:n${limit}`;
+  const { value } = await nominatimRequestMany({ q: query }, key, limit);
+  return value ?? [];
 }
 
 async function nominatimFetch(query: string): Promise<GeocodeResult | null> {
@@ -436,8 +616,9 @@ export async function geocodeWithRetries(
   address: string,
 ): Promise<GeocodeResult | null> {
   for (const query of geocodeAddressAttempts(address)) {
-    const hit = await geocodeLocation(query);
-    if (hit) return hit;
+    const candidates = await nominatimFetchCandidates(query, 8);
+    const best = pickBestGeocodeResult(candidates, address);
+    if (best) return best;
   }
 
   const parsed = parseAddressForGeocode(address);
@@ -462,6 +643,20 @@ export type LocalityGeocodePin = {
 };
 
 /** Geocode a neighbourhood name biased toward the venue pin (~6 km viewbox). */
+/**
+ * A neighbourhood lookup must land on an area, not a business that shares the
+ * name ("Golden Horseshoe" → a barbecue restaurant) or an electoral riding.
+ */
+export function isAreaLikeHit(hit: GeocodeResult): boolean {
+  const c = (hit.placeClass ?? "").toLowerCase();
+  const t = (hit.placeType ?? "").toLowerCase();
+  if (!c) return true;
+  if (c === "place") return true;
+  if (c === "boundary") return t === "administrative";
+  if (c === "landuse") return t === "residential";
+  return false;
+}
+
 export async function geocodeLocalityNearPin(
   localityName: string,
   pin: LocalityGeocodePin,
@@ -482,7 +677,7 @@ export async function geocodeLocalityNearPin(
 
   for (const q of [...new Set(queries)]) {
     const hit = await nominatimFetchBounded(q, viewbox);
-    if (hit) {
+    if (hit && isAreaLikeHit(hit)) {
       cacheSet(cacheKey, hit);
       return hit;
     }
@@ -490,7 +685,7 @@ export async function geocodeLocalityNearPin(
 
   for (const q of [...new Set(queries)]) {
     const hit = await nominatimFetch(q);
-    if (hit) {
+    if (hit && isAreaLikeHit(hit)) {
       cacheSet(cacheKey, hit);
       return hit;
     }

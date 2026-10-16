@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
+import { SiteFooter } from "@/components/site-footer";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -19,9 +20,8 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "Lineup Booker · Qloo Hackathon",
-  description:
-    "Suggest a headliner, opener, and promo neighborhoods from nearby taste signals.",
+  title: "Lineup Booker",
+  description: "Suggest a headliner, opener, and neighborhoods for your venue.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -30,7 +30,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-background">{children}</body>
+      <body className="min-h-full flex flex-col bg-background">
+        {children}
+        <SiteFooter />
+      </body>
     </html>
   );
 }

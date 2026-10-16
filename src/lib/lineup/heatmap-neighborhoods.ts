@@ -7,6 +7,7 @@ import type { QlooHeatmapPoint } from "@/lib/qloo/types";
 import {
   displayNeighborhoodName,
   isNonPromotableNeighborhoodLabel,
+  sameBoroughAsPin,
   type VenuePin,
 } from "./geography";
 import type { PromoteNeighborhood } from "./neighborhoods";
@@ -20,6 +21,10 @@ export type NeighborhoodCandidate = {
   score: number;
   source: "grid" | "locality";
   distanceKm?: number;
+  lat?: number;
+  lon?: number;
+  /** Honest label when not from the primary artist heatmap row. */
+  fallbackKind?: "tag_heatmap" | "near_venue";
 };
 
 export function neighborhoodRankingScore(candidate: NeighborhoodCandidate): number {
@@ -79,6 +84,7 @@ export function rankHeatmapCells(
 export async function collectGridNeighborhoodCandidates(
   grid: QlooHeatmapPoint[],
   pin: VenuePin,
+  stopAt = Number.POSITIVE_INFINITY,
 ): Promise<{ candidates: NeighborhoodCandidate[]; audit: GridNeighborhoodAudit[] }> {
   const audit: GridNeighborhoodAudit[] = [];
   const cells = rankHeatmapCells(grid, pin);
@@ -91,6 +97,7 @@ export async function collectGridNeighborhoodCandidates(
 
   for (const cell of cells) {
     if (candidates.length >= TARGET_NEIGHBORHOODS) break;
+    if (Date.now() > stopAt) break;
 
     const cellDistanceKm = haversineKm(
       pin.lat,
@@ -102,7 +109,11 @@ export async function collectGridNeighborhoodCandidates(
     const reverseKey = `${cell.lat.toFixed(3)}:${cell.lon.toFixed(3)}`;
     let reverseLookup = reverseByRoundedCell.get(reverseKey);
     if (!reverseLookup) {
-      reverseLookup = await reverseGeocodeNeighborhood(cell.lat, cell.lon);
+      try {
+        reverseLookup = await reverseGeocodeNeighborhood(cell.lat, cell.lon);
+      } catch {
+        break;
+      }
       reverseByRoundedCell.set(reverseKey, reverseLookup);
     }
     const { value: reverse } = reverseLookup;
@@ -146,6 +157,18 @@ export async function collectGridNeighborhoodCandidates(
       continue;
     }
 
+    if (!sameBoroughAsPin(pin, reverse.address)) {
+      audit.push({
+        lat: cell.lat,
+        lon: cell.lon,
+        affinity: cell.affinity,
+        label: rawLabel,
+        kept: false,
+        reason: "different borough from venue",
+      });
+      continue;
+    }
+
     const key = rawLabel.trim().toLowerCase();
     if (seenLabels.has(key)) {
       audit.push({
@@ -165,6 +188,8 @@ export async function collectGridNeighborhoodCandidates(
       score: cell.affinity,
       source: "grid",
       distanceKm: cellDistanceKm,
+      lat: cell.lat,
+      lon: cell.lon,
     });
     audit.push({
       lat: cell.lat,
@@ -177,6 +202,40 @@ export async function collectGridNeighborhoodCandidates(
   }
 
   return { candidates, audit };
+}
+
+function normalizeNeighborhoodKey(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[\u2013\u2014-]/g, "-");
+}
+
+/** Drop "University" when "University–Rosedale" is already kept (name containment). */
+function dedupeContainedNames(
+  candidates: NeighborhoodCandidate[],
+): NeighborhoodCandidate[] {
+  const sorted = [...candidates].sort(
+    (a, b) => neighborhoodRankingScore(b) - neighborhoodRankingScore(a),
+  );
+  const kept: NeighborhoodCandidate[] = [];
+  for (const c of sorted) {
+    const key = normalizeNeighborhoodKey(c.name);
+    const dominatedIdx = kept.findIndex((k) => {
+      const kk = normalizeNeighborhoodKey(k.name);
+      return kk !== key && (kk.includes(key) || key.includes(kk));
+    });
+    if (dominatedIdx >= 0) {
+      const dominated = kept[dominatedIdx]!;
+      if (neighborhoodRankingScore(c) > neighborhoodRankingScore(dominated)) {
+        kept[dominatedIdx] = c;
+      }
+      continue;
+    }
+    kept.push(c);
+  }
+  return kept;
 }
 
 export function mergeNeighborhoodCandidates(
@@ -193,11 +252,20 @@ export function mergeNeighborhoodCandidates(
       byName.set(key, candidate);
     }
   }
-  return [...byName.values()].sort((a, b) => {
+  return dedupeContainedNames([...byName.values()]).sort((a, b) => {
     const scoreDiff = neighborhoodRankingScore(b) - neighborhoodRankingScore(a);
     if (scoreDiff !== 0) return scoreDiff;
     return (a.distanceKm ?? 999) - (b.distanceKm ?? 999);
   });
+}
+
+// The card shows plain place names; where a fallback area came from is
+// explained once in the scouting log ("How I got here"), not per pin.
+function labelWithProvenance(
+  row: NeighborhoodCandidate,
+  venueCity: string,
+): string {
+  return displayNeighborhoodName(row.name, venueCity);
 }
 
 export function candidatesToPromoteList(
@@ -205,8 +273,10 @@ export function candidatesToPromoteList(
   venueCity: string,
 ): PromoteNeighborhood[] {
   return merged.slice(0, TARGET_NEIGHBORHOODS).map((row, index) => ({
-    name: displayNeighborhoodName(row.name, venueCity),
+    name: labelWithProvenance(row, venueCity),
     rank: index + 1,
+    lat: row.lat,
+    lon: row.lon,
   }));
 }
 

@@ -1,31 +1,29 @@
-const DEFAULT_TTL_MS = 90_000;
+import {
+  getPersistentStore,
+  normalizeQlooCacheKey,
+} from "@/lib/cache/persistent-store";
 
-type CacheEntry = {
-  expiresAt: number;
-  data: unknown;
-};
+const QLOO_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-const memory = new Map<string, CacheEntry>();
+const store = getPersistentStore();
 
-export function getCachedQlooResponse<T>(url: string): T | undefined {
-  const hit = memory.get(url);
-  if (!hit) return undefined;
-  if (hit.expiresAt <= Date.now()) {
-    memory.delete(url);
-    return undefined;
-  }
-  return hit.data as T;
+export async function getCachedQlooResponse<T>(
+  url: string,
+): Promise<T | undefined> {
+  const key = normalizeQlooCacheKey(url);
+  return store.get<T>(`qloo:${key}`);
 }
 
-export function setCachedQlooResponse(
+export async function setCachedQlooResponse(
   url: string,
   data: unknown,
-  ttlMs: number = DEFAULT_TTL_MS,
-): void {
-  memory.set(url, { data, expiresAt: Date.now() + ttlMs });
+  ttlMs: number = QLOO_TTL_MS,
+): Promise<void> {
+  const key = normalizeQlooCacheKey(url);
+  await store.set(`qloo:${key}`, data, ttlMs);
 }
 
 /** @internal tests */
 export function clearQlooResponseCache(): void {
-  memory.clear();
+  // Memory layer clears on process restart; tests use mock transport.
 }

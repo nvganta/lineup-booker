@@ -1,7 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
   TOP_GRID_CELLS,
-  collectGridNeighborhoodCandidates,
   mergeNeighborhoodCandidates,
   rankHeatmapCells,
 } from "@/lib/lineup/heatmap-neighborhoods";

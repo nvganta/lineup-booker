@@ -6,6 +6,8 @@ import {
   isSamePerson,
 } from "./artist-filter";
 import type { ProvenanceRequest } from "./translate-venue";
+import { isActorFirstByWikipedia } from "@/lib/agent/research/actor-screen";
+import { hintsFromQlooEntity } from "@/lib/agent/research/qloo-hints";
 
 export type OpenerAudit = {
   name: string;
@@ -94,6 +96,11 @@ export async function pickOpener(
       const local = localResults[j] ?? false;
       if (!local) {
         audit.push({ ...base, reason: "no local signal in city" });
+        continue;
+      }
+
+      if (await isActorFirstByWikipedia(candidate.name, hintsFromQlooEntity(candidate))) {
+        audit.push({ ...base, reason: "actor-first profile (public bio)" });
         continue;
       }
 

@@ -41,6 +41,26 @@ export function popularityBandFromConcept(concept: string): PopularityBand {
   return { headlinerMin: 0.7, headlinerMax: 0.94, openerMax: 0.9, seatCapacity: seats };
 }
 
+export function widenPopularityBand(
+  band: PopularityBand,
+  widen: 0 | 1 | 2,
+): PopularityBand {
+  if (widen === 0) return band;
+  const delta = widen === 2 ? 0.1 : 0.05;
+  return {
+    ...band,
+    headlinerMin:
+      band.headlinerMin != null
+        ? Math.max(0, band.headlinerMin - delta)
+        : undefined,
+    headlinerMax:
+      band.headlinerMax != null
+        ? Math.min(1, band.headlinerMax + delta)
+        : undefined,
+    openerMax: Math.min(1, band.openerMax + delta),
+  };
+}
+
 export function tierLabel(rank: number, tier: "headliner" | "opener"): string {
   if (tier === "headliner") {
     return rank === 1 ? "Top local match" : `#${rank} in your crowd profile`;

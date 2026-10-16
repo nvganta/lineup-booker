@@ -7,9 +7,13 @@ import {
 import type { GeocodeResult } from "@/lib/geocode/nominatim";
 
 describe("displayNeighborhoodName", () => {
-  it('labels bare Downtown as "Downtown City"', () => {
-    expect(displayNeighborhoodName("Downtown", "Vancouver")).toBe(
-      "Downtown Vancouver",
+  it('labels bare Downtown without appending the city', () => {
+    expect(displayNeighborhoodName("Downtown", "Vancouver")).toBe("Downtown");
+  });
+
+  it("strips trailing city from neighborhood labels", () => {
+    expect(displayNeighborhoodName("Downtown Vancouver", "Vancouver")).toBe(
+      "Downtown",
     );
   });
 });

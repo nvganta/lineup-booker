@@ -60,6 +60,7 @@ export type QlooInsightsResponse = {
     heatmap?: QlooHeatmapPoint[];
     tags?: QlooTag[];
   };
+  tags?: QlooTag[];
   query?: Record<string, unknown>;
   duration?: number;
 };

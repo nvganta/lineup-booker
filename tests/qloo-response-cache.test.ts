@@ -1,24 +1,26 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  clearQlooResponseCache,
   getCachedQlooResponse,
   setCachedQlooResponse,
 } from "@/lib/qloo/response-cache";
 
-describe("Qloo response cache", () => {
-  beforeEach(() => {
-    clearQlooResponseCache();
+describe("qloo response cache", () => {
+  it("stores and reads by normalized url key", async () => {
+    await setCachedQlooResponse(
+      "https://example.com/a?X-Api-Key=secret",
+      { ok: true },
+      60_000,
+    );
+    await expect(
+      getCachedQlooResponse<{ ok: boolean }>(
+        "https://example.com/a?X-Api-Key=other",
+      ),
+    ).resolves.toEqual({ ok: true });
   });
 
-  it("returns cached payload within TTL", () => {
-    setCachedQlooResponse("https://example.com/a", { ok: true }, 60_000);
-    expect(getCachedQlooResponse<{ ok: boolean }>("https://example.com/a")).toEqual({
-      ok: true,
-    });
-  });
-
-  it("expires stale entries", () => {
-    setCachedQlooResponse("https://example.com/b", { n: 1 }, -1);
-    expect(getCachedQlooResponse("https://example.com/b")).toBeUndefined();
+  it("expires entries past ttl", async () => {
+    await setCachedQlooResponse("https://example.com/b", { n: 1 }, 1);
+    await new Promise((r) => setTimeout(r, 5));
+    await expect(getCachedQlooResponse("https://example.com/b")).resolves.toBeUndefined();
   });
 });

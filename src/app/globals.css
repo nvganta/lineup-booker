@@ -112,3 +112,7 @@
 .animate-lineup-settle {
   animation: lineup-settle 0.55s ease-out both;
 }
+
+.lineup-map-tiles .leaflet-tile-pane {
+  filter: grayscale(1) sepia(0.15) contrast(0.9) brightness(1.05);
+}

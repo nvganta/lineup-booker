@@ -4,6 +4,7 @@ import {
   isNonPromotableNeighborhoodLabel,
   isStatisticalRegionLabel,
   isVenueCityName,
+  sameBoroughAsPin,
 } from "@/lib/lineup/geography";
 import {
   mergeNeighborhoodCandidates,
@@ -60,5 +61,25 @@ describe("neighbourhood ranking by proximity", () => {
     expect(neighborhoodRankingScore(merged[0]!)).toBeGreaterThan(
       neighborhoodRankingScore(merged[1]!),
     );
+  });
+});
+
+describe("sameBoroughAsPin", () => {
+  const pin = {
+    lat: 40.71,
+    lon: -73.96,
+    city: "New York",
+    suburb: "Brooklyn",
+    county: "Kings County",
+  };
+  it("drops a heatmap cell in another borough", () => {
+    expect(
+      sameBoroughAsPin(pin, { suburb: "Manhattan", county: "New York County" }),
+    ).toBe(false);
+  });
+  it("keeps a cell in the venue borough", () => {
+    expect(
+      sameBoroughAsPin(pin, { suburb: "Brooklyn", county: "Kings County" }),
+    ).toBe(true);
   });
 });

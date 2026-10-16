@@ -85,6 +85,12 @@ export async function resolveVenueSignals(
     country: geocode.country,
     county: geocode.county,
     stateDistrict: geocode.stateDistrict,
+    // Same fields locate_venue sets, so Quick mode gets the borough check too.
+    suburb:
+      geocode.address?.suburb ??
+      geocode.address?.neighbourhood ??
+      geocode.address?.neighborhood,
+    borough: geocode.address?.borough ?? geocode.address?.city_district,
   };
 
   return {

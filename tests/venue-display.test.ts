@@ -6,5 +6,8 @@ describe("venueDisplayName", () => {
     expect(
       venueDisplayName("Natural wine cafe-bar, 300 capacity"),
     ).toBe("Natural wine cafe-bar");
+    expect(
+      venueDisplayName("Neighborhood taco bar, 150 capacity"),
+    ).toBe("Neighborhood taco bar");
   });
 });

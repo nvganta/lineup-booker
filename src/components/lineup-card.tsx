@@ -1,123 +1,148 @@
+"use client";
+
+import dynamic from "next/dynamic";
 import type { LineupResult } from "@/lib/lineup/build-lineup";
+import { ArtistPhoto } from "@/components/artist-photo";
+import { HeadlinerHero } from "@/components/headliner-hero";
+import { Badge } from "@/components/ui/badge";
+import { stripCityFromNeighborhoodLabel } from "@/lib/lineup/neighborhood-display";
 import { cn } from "@/lib/utils";
+
+const LineupMap = dynamic(
+  () => import("@/components/lineup-map").then((m) => m.LineupMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[200px] rounded-md border border-[#e8dfd6] bg-[#f3ece4] animate-pulse" />
+    ),
+  },
+);
 
 type Props = {
   lineup: LineupResult;
   className?: string;
+  preview?: boolean;
 };
 
-function ArtistBlock({
-  role,
-  artist,
-  featured,
-}: {
-  role: string;
-  artist: LineupResult["headliner"];
-  featured?: boolean;
-}) {
-  return (
-    <div className={cn("space-y-2", featured && "md:col-span-2")}>
-      <p className="text-[11px] uppercase tracking-[0.2em] text-[#6b5c52]">
-        {role}
-      </p>
-      <p className="text-sm text-[#8c4a32] font-medium tracking-wide">
-        {artist.tierLabel}
-      </p>
-      <h3
-        className={cn(
-          "font-heading leading-none text-[#1a1614]",
-          featured ? "text-4xl md:text-5xl" : "text-2xl md:text-3xl",
-        )}
-      >
-        {artist.name}
-      </h3>
-      {artist.detail && (
-        <p className="text-sm text-[#5c534d] leading-relaxed max-w-prose">
-          {artist.detail}
-        </p>
-      )}
-    </div>
-  );
-}
+export function LineupCard({ lineup, className, preview }: Props) {
+  const noMatch = lineup.headliner.id === "no-headliner-match";
 
-export function LineupCard({ lineup, className }: Props) {
   return (
     <article
       className={cn(
-        "relative mx-auto w-full max-w-2xl rounded-sm border border-[#e8dfd6] bg-[#f7f2eb] text-[#1a1614] shadow-[0_1px_0_rgba(26,22,20,0.06),0_24px_48px_-24px_rgba(26,22,20,0.25)]",
-        "px-8 py-10 md:px-12 md:py-14",
+        "relative mx-auto w-full max-w-xl overflow-hidden rounded-sm border border-[#e8dfd6] bg-[#f7f2eb] text-[#1a1614]",
+        "shadow-[0_1px_0_rgba(26,22,20,0.06),0_20px_40px_-24px_rgba(26,22,20,0.22)]",
+        preview && "opacity-[0.92] scale-[0.98] origin-top",
         className,
       )}
     >
-      <div className="flex flex-wrap items-baseline justify-between gap-4 border-b border-[#e0d5ca] pb-6 mb-8">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.25em] text-[#8c4a32]">
+      <div className="px-5 pt-5 pb-3 flex items-start justify-between gap-3 border-b border-[#e0d5ca]">
+        <div className="min-w-0">
+          <p className="text-[10px] uppercase tracking-[0.28em] text-[#8c4a32]">
             {lineup.eventLabel}
           </p>
-          <p className="font-heading text-xl mt-1">{lineup.venueLabel}</p>
+          <p className="font-heading text-lg md:text-xl leading-tight mt-1 truncate">
+            {lineup.venueLabel}
+          </p>
         </div>
-        <p className="text-[#6b5c52] uppercase tracking-widest text-[11px]">
-          One night
-        </p>
-      </div>
-
-      <div className="grid gap-10 md:grid-cols-2 md:gap-12">
-        <ArtistBlock role="Headliner" artist={lineup.headliner} featured />
-        {lineup.opener ? (
-          <ArtistBlock role="Opener" artist={lineup.opener} />
-        ) : (
-          <div className="space-y-2">
-            <p className="text-[11px] uppercase tracking-[0.2em] text-[#6b5c52]">
-              Opener
-            </p>
-            <p className="font-heading text-2xl md:text-3xl text-[#5c534d]">
-              No strong local opener found
-            </p>
-          </div>
+        {preview && (
+          <Badge
+            variant="outline"
+            className="shrink-0 rounded-full border-[#d4c4b5] text-[#6b5c52] text-[10px] uppercase tracking-wider bg-[#fcf9f5]"
+          >
+            Sample
+          </Badge>
         )}
       </div>
 
-      {lineup.alternates.length > 0 && (
-        <section className="mt-10 pt-8 border-t border-[#e0d5ca]">
-          <p className="text-[11px] uppercase tracking-[0.2em] text-[#6b5c52] mb-3">
-            Also strong in your crowd profile
-          </p>
-          <ol className="space-y-2 text-base text-[#1a1614] list-none">
-            {lineup.alternates.map((a) => (
-              <li key={a.id} className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
-                <span className="text-sm text-[#8c4a32] shrink-0">
-                  {a.tierLabel}
-                </span>
-                <span className="font-heading">{a.name}</span>
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
+      <HeadlinerHero artist={lineup.headliner} noMatch={noMatch} />
 
-      {lineup.neighborhoods.length > 0 && (
-        <section className="mt-12 pt-8 border-t border-[#e0d5ca]">
-          <p className="text-[11px] uppercase tracking-[0.2em] text-[#6b5c52] mb-4">
-            Promote in these neighborhoods
-          </p>
-          <ul className="grid gap-3 sm:grid-cols-2">
-            {lineup.neighborhoods.map((n) => (
-              <li
-                key={`${n.rank}-${n.name}`}
-                className="border border-[#e8dfd6] bg-[#fcf9f5] px-4 py-3"
-              >
-                <p className="font-heading text-lg">
-                  #{n.rank} {n.name}
+      <div className="p-5 space-y-6">
+        {lineup.opener ? (
+          <section className="flex gap-3 items-center">
+            <ArtistPhoto
+              name={lineup.opener.name}
+              imageUrl={lineup.opener.imageUrl}
+              rounded="full"
+              className="h-14 w-14 text-lg"
+            />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-[10px] uppercase tracking-[0.22em] text-[#6b5c52]">
+                  Opener
                 </p>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+                <Badge className="rounded-full bg-[#8c4a32]/10 text-[#8c4a32] border-0 text-[10px] uppercase tracking-wide hover:bg-[#8c4a32]/10">
+                  Local
+                </Badge>
+              </div>
+              <p className="font-heading text-xl leading-tight mt-0.5">
+                {lineup.opener.name}
+              </p>
+            </div>
+          </section>
+        ) : (
+          !noMatch && (
+            <section>
+              <p className="text-[10px] uppercase tracking-[0.22em] text-[#6b5c52]">
+                Opener
+              </p>
+              <p className="font-heading text-xl text-[#5c534d] mt-1">
+                No local opener
+              </p>
+            </section>
+          )
+        )}
 
-      <p className="mt-10 text-xs text-[#8a7f76] text-center">
-        Powered by Qloo taste data.
-      </p>
+        {lineup.alternates.length > 0 && (
+          <section className="border-t border-[#e8dfd6] pt-5 space-y-3">
+            <p className="text-[10px] uppercase tracking-[0.22em] text-[#6b5c52]">
+              Also strong
+            </p>
+            <ul className="flex flex-wrap gap-4 list-none">
+              {lineup.alternates.map((a) => (
+                <li key={a.id} className="flex flex-col items-center gap-1.5 w-[4.5rem]">
+                  <ArtistPhoto
+                    name={a.name}
+                    imageUrl={a.imageUrl}
+                    rounded="full"
+                    className="h-12 w-12 text-sm"
+                  />
+                  <span className="text-[11px] text-center leading-tight text-[#1a1614] line-clamp-2">
+                    {a.name}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {lineup.neighborhoods.length > 0 && (
+          <section className="border-t border-[#e8dfd6] pt-5 space-y-3">
+            <p className="text-[10px] uppercase tracking-[0.22em] text-[#6b5c52]">
+              Promote nearby
+            </p>
+            {lineup.venue && (
+              <LineupMap lineup={lineup} className="h-[200px] md:h-[220px]" />
+            )}
+            <ol className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 list-none text-sm">
+              {lineup.neighborhoods.map((n) => (
+                <li key={n.rank} className="flex gap-2 items-baseline">
+                  <span className="text-[#8c4a32] font-medium tabular-nums">
+                    {n.rank}.
+                  </span>
+                  <span className="font-heading">
+                    {stripCityFromNeighborhoodLabel(
+                      n.name,
+                      lineup.venue?.city,
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
+      </div>
+
     </article>
   );
 }

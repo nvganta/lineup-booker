@@ -1,8 +1,10 @@
 import {
   cityFromAddress,
   geocodeLocalityNearPin,
+  reverseGeocodeNeighborhood,
   type GeocodeResult,
 } from "@/lib/geocode/nominatim";
+import { stripCityFromNeighborhoodLabel } from "@/lib/lineup/neighborhood-display";
 import type { QlooEntity } from "@/lib/qloo/types";
 
 export type VenuePin = {
@@ -13,6 +15,19 @@ export type VenuePin = {
   country?: string;
   county?: string;
   stateDistrict?: string;
+  suburb?: string;
+  borough?: string;
+  city_district?: string;
+  /** Neighbourhood at the venue pin (reverse geocode or geocoder suburb). */
+  homeNeighborhood?: string;
+};
+
+const NYC_COUNTY_TO_BOROUGH: Record<string, string> = {
+  "kings county": "brooklyn",
+  "new york county": "manhattan",
+  "queens county": "queens",
+  "bronx county": "bronx",
+  "richmond county": "staten island",
 };
 
 export type LocalityRow = QlooEntity & {
@@ -23,6 +38,8 @@ export type LocalityAudit = {
   name: string;
   affinity?: number;
   distanceKm: number | null;
+  lat?: number;
+  lon?: number;
   sameCity: boolean;
   kept: boolean;
   reason: string;
@@ -260,19 +277,95 @@ export function sameLocalityArea(
     return true;
   }
 
-  const venueState = normalizeCityLabel(venue.state ?? "");
-  const locState = normalizeCityLabel(localityGeocode.state ?? "");
-  if (
-    venueState &&
-    locState &&
-    venueState === locState &&
-    locCity.length > 0 &&
-    venueCity.length > 0
-  ) {
+  return false;
+}
+
+/** Admin units above neighbourhood level (no hardcoded city lists). */
+export function isMacroAdminNeighborhoodName(name: string): boolean {
+  const n = name.trim().toLowerCase();
+  if (/\bcounty\b/.test(n)) return true;
+  if (/^metro |^greater /i.test(name.trim())) return true;
+  if (/^city of\b/.test(n)) return true;
+  if (/\sisland$/i.test(n.trim()) && !/\b(university|rhode)\b/i.test(n)) {
     return true;
   }
-
+  if (isStatisticalRegionLabel(name)) return true;
+  if (isAdminDivisionName(name)) return true;
   return false;
+}
+
+/** @deprecated use isMacroAdminNeighborhoodName */
+export function isBoroughOrRegionLabel(name: string): boolean {
+  return isMacroAdminNeighborhoodName(name);
+}
+
+function boroughFromCounty(county?: string): string | undefined {
+  if (!county) return undefined;
+  return NYC_COUNTY_TO_BOROUGH[county.trim().toLowerCase()];
+}
+
+/** Best-effort NYC / metro borough for comparing fan-heat rows to the venue pin. */
+function normalizeBorough(raw: string | undefined, city: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  const fromCounty = boroughFromCounty(raw);
+  if (fromCounty) return fromCounty;
+  const n = canonicalCityLabel(raw);
+  if (!n || (city && n === canonicalCityLabel(city))) return undefined;
+  return n;
+}
+
+/**
+ * Borough-level area for the pin (NYC borough, London borough, city district).
+ * Suburb and neighbourhood are deliberately not used: two different
+ * neighbourhoods are not two different boroughs.
+ */
+export function promotionBoroughForPin(pin: VenuePin): string | undefined {
+  return (
+    normalizeBorough(pin.borough, pin.city) ??
+    normalizeBorough(pin.county && boroughFromCounty(pin.county) ? pin.county : undefined, pin.city) ??
+    normalizeBorough(pin.city_district, pin.city)
+  );
+}
+
+function promotionBoroughFromGeocode(hit: GeocodeResult): string | undefined {
+  const addr = hit.address ?? {};
+  const city = addr.city ?? hit.cityForHeatmap;
+  return (
+    normalizeBorough(addr.borough, city) ??
+    normalizeBorough(addr.city_district, city) ??
+    normalizeBorough(
+      hit.county && boroughFromCounty(hit.county) ? hit.county : undefined,
+      city,
+    )
+  );
+}
+
+export function samePromotableLocalityArea(
+  pin: VenuePin,
+  localityGeocode: GeocodeResult,
+): boolean {
+  if (!sameLocalityArea(pin, localityGeocode)) return false;
+  const venueBorough = promotionBoroughForPin(pin);
+  const locBorough = promotionBoroughFromGeocode(localityGeocode);
+  if (venueBorough && locBorough && venueBorough !== locBorough) {
+    return false;
+  }
+  return true;
+}
+
+/** Reverse-geocoded heatmap cells get the same borough check as locality rows. */
+export function sameBoroughAsPin(
+  pin: VenuePin,
+  address: GeocodeResult["address"] | undefined,
+): boolean {
+  if (!address) return true;
+  const venueBorough = promotionBoroughForPin(pin);
+  if (!venueBorough) return true;
+  const cellBorough = promotionBoroughFromGeocode({
+    address,
+    county: address.county,
+  } as GeocodeResult);
+  return !cellBorough || cellBorough === venueBorough;
 }
 
 export function isVenueCityName(name: string, pin: VenuePin): boolean {
@@ -286,7 +379,20 @@ export function isNonPromotableNeighborhoodLabel(
   disambiguation?: string,
 ): boolean {
   if (isBroadRegion(name, disambiguation)) return true;
+  if (isMacroAdminNeighborhoodName(name)) return true;
   if (isVenueCityName(name, pin)) return true;
+  if (
+    /\s+centre$/i.test(name.trim()) &&
+    !/^city centre$/i.test(name.trim())
+  ) {
+    return true;
+  }
+  if (/\belectoral\b/i.test(disambiguation ?? "")) return true;
+  // The venue's own borough ("Brooklyn") is too broad to poster.
+  const venueBorough = promotionBoroughForPin(pin);
+  if (venueBorough && normalizeBorough(name, pin.city) === venueBorough) {
+    return true;
+  }
 
   const n = name.trim().toLowerCase();
   if (/^city of\b/.test(n)) return true;
@@ -297,11 +403,16 @@ export function isNonPromotableNeighborhoodLabel(
 }
 
 export function displayNeighborhoodName(name: string, venueCity: string): string {
-  if (name.trim().toLowerCase() === "downtown") {
-    const city = venueCity.replace(/\bec\d[a-z]\d?\b/gi, "").trim();
-    return `Downtown ${city}`;
+  // OSM names some areas by their civic body ("Los Feliz Neighborhood
+  // Council District"); the poster needs the place name.
+  const stripped = stripCityFromNeighborhoodLabel(name, venueCity).replace(
+    /\s+(neighbou?rhood council(\s+district)?|community board(\s+\d+)?)$/i,
+    "",
+  );
+  if (stripped.trim().toLowerCase() === "downtown") {
+    return "Downtown";
   }
-  return name;
+  return stripped;
 }
 
 function dedupeLocalities(entities: LocalityRow[]): LocalityRow[] {
@@ -350,6 +461,8 @@ async function localityPoint(
 export async function filterNeighborhoodLocalities(
   entities: LocalityRow[],
   pin: VenuePin,
+  /** Stop geocoding after this time (ms epoch); Nominatim is ~1 req/s. */
+  stopAt = Number.POSITIVE_INFINITY,
 ): Promise<{
   kept: LocalityRow[];
   audit: LocalityAudit[];
@@ -363,6 +476,7 @@ export async function filterNeighborhoodLocalities(
 
   for (const entity of trimmed) {
     if (kept.length >= TARGET_KEPT_LOCALITIES) break;
+    if (Date.now() > stopAt) break;
 
     const name = entity.name;
     const affinity = entity.query?.affinity;
@@ -379,8 +493,14 @@ export async function filterNeighborhoodLocalities(
       continue;
     }
 
-    const { point, nominatimNetwork } = await localityPoint(entity, pin);
-    void nominatimNetwork;
+    let located: Awaited<ReturnType<typeof localityPoint>>;
+    try {
+      located = await localityPoint(entity, pin);
+    } catch {
+      // Lookup budget or time limit: keep the areas already confirmed.
+      break;
+    }
+    const { point } = located;
 
     if (!point) {
       audit.push({
@@ -413,9 +533,25 @@ export async function filterNeighborhoodLocalities(
       continue;
     }
 
-    const sameCity = point.geocode
-      ? sameLocalityArea(pin, point.geocode)
+    // Qloo boundary centroids skip geocoding; in a city with boroughs, check
+    // the centroid's borough so a Brooklyn room doesn't promote in Manhattan.
+    let sameCity = point.geocode
+      ? samePromotableLocalityArea(pin, point.geocode)
       : true;
+    // Only true NYC boroughs: each check costs a Nominatim call from the
+    // agent's 20-call budget, and an exhausted budget drops every area.
+    const venueBorough = promotionBoroughForPin(pin);
+    if (sameCity && !point.geocode && venueBorough) {
+      try {
+        const { value: reverse } = await reverseGeocodeNeighborhood(
+          point.lat,
+          point.lon,
+        );
+        sameCity = sameBoroughAsPin(pin, reverse?.address);
+      } catch {
+        // Budget or network: keep the row rather than lose the area.
+      }
+    }
 
     if (!sameCity) {
       audit.push({
@@ -424,7 +560,9 @@ export async function filterNeighborhoodLocalities(
         distanceKm,
         sameCity: false,
         kept: false,
-        reason: "geocoded outside venue area",
+        reason: point.geocode
+          ? "geocoded outside venue area"
+          : "geocoded outside venue area",
       });
       continue;
     }
@@ -433,6 +571,8 @@ export async function filterNeighborhoodLocalities(
       name,
       affinity,
       distanceKm,
+      lat: point.lat,
+      lon: point.lon,
       sameCity: true,
       kept: true,
       reason: "within radius and venue area",

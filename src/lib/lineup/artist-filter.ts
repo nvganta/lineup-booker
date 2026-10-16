@@ -77,6 +77,13 @@ export function hasMusicCareerEvidence(entity: QlooEntity): boolean {
   return false;
 }
 
+const ACTOR_PROFILE_TAG =
+  /(?:^|:)(actress|actor|film_actor|television_actor|voice_actor)(?:$|:|_)/;
+
+function actorProfileTags(tagIds: string[]): string[] {
+  return tagIds.filter((id) => ACTOR_PROFILE_TAG.test(id));
+}
+
 function isDominatedByNonMusicCareer(
   musicTags: string[],
   careerTags: string[],
@@ -86,10 +93,25 @@ function isDominatedByNonMusicCareer(
   return musicTags.length === 1 && careerTags.length >= 2;
 }
 
+/** Qloo rows that read as “actor first” despite a stray music tag. */
+export function isPrimarilyActorProfile(entity: QlooEntity): boolean {
+  const ids = entityTagIds(entity);
+  const actors = actorProfileTags(ids);
+  if (actors.length === 0) return false;
+  const musicTags = musicGenreTagIds(ids);
+  if (musicTags.length === 0) return true;
+  if (hasMusicCareerEvidence(entity)) {
+    return actors.length > musicTags.length;
+  }
+  return actors.length >= musicTags.length;
+}
+
 function passesMusicCareerGate(entity: QlooEntity): boolean {
   const ids = entityTagIds(entity);
   const musicTags = musicGenreTagIds(ids);
   if (musicTags.length === 0) return false;
+
+  if (isPrimarilyActorProfile(entity)) return false;
 
   const careerTags = dominantNonMusicCareerTags(ids);
   if (isDominatedByNonMusicCareer(musicTags, careerTags)) return false;
@@ -128,12 +150,14 @@ export function qlooObscurityLevel(entity: QlooEntity): number | null {
 function isTooFamousForSmallRoom(
   entity: QlooEntity,
   band?: PopularityBand,
+  relaxObscurityOneStep = false,
 ): boolean {
   const seatCap = band?.seatCapacity;
   if (seatCap === undefined || seatCap > 300) return false;
   const obscurity = qlooObscurityLevel(entity);
   if (obscurity === null) return false;
-  return obscurity <= 2;
+  const floor = relaxObscurityOneStep ? 1 : 2;
+  return obscurity <= floor;
 }
 
 function requestWantsAggressive(genreTagIds: string[]): boolean {
@@ -264,16 +288,23 @@ function eligibleAsAlternate(
   entity: QlooEntity,
   band: PopularityBand | undefined,
   headliner: QlooEntity,
+  relaxObscurityOneStep = false,
 ): boolean {
   if (!band) return true;
 
-  if (isTooFamousForSmallRoom(entity, band)) return false;
+  if (isTooFamousForSmallRoom(entity, band, relaxObscurityOneStep)) {
+    return false;
+  }
 
   const pop = entity.popularity ?? 0;
   const headlinerPop = headliner.popularity ?? 0;
   const seatCap = band.seatCapacity;
   if (seatCap !== undefined && seatCap <= 200) {
-    if (pop > headlinerPop + 0.05) return false;
+    // A bench act may sit anywhere in the room's band. Capping it just above
+    // the headliner emptied the bench whenever the pick was the least known
+    // act in the band (Toronto, 60 seats: headliner 0.57, band to 0.88).
+    const ceiling = Math.max(headlinerPop + 0.05, band.headlinerMax ?? 0);
+    if (pop > ceiling) return false;
   }
 
   return true;
@@ -325,7 +356,8 @@ function rankHeadlinerPool(
   const pool = filterMusicArtists(entities, genreTagIds, exclude).filter(
     (entity) =>
       meaningfulGenreOverlap(entity, genreTagIds) &&
-      !isLikelyArenaActForSmallRoom(entity, band, genreTagIds),
+      !isLikelyArenaActForSmallRoom(entity, band, genreTagIds) &&
+      !isTooFamousForSmallRoom(entity, band),
   );
 
   return [...pool].sort((a, b) => {
@@ -356,9 +388,22 @@ export function rankAlternateHeadliners(
   band: PopularityBand | undefined,
   headliner: QlooEntity,
   exclude: QlooEntity[] = [],
+  options?: {
+    relaxObscurityForTinyRoom?: boolean;
+    /** Tiny rooms: allow alternates outside the headliner pop cap. */
+    relaxBandCapForBench?: boolean;
+  },
 ): QlooEntity[] {
-  return rankHeadlinerCandidates(entities, genreTagIds, band, exclude).filter(
-    (entity) => eligibleAsAlternate(entity, band, headliner),
+  const relax = Boolean(
+    options?.relaxObscurityForTinyRoom &&
+      band?.seatCapacity !== undefined &&
+      band.seatCapacity <= 120,
+  );
+  const pool = options?.relaxBandCapForBench
+    ? rankHeadlinerPool(entities, genreTagIds, band, exclude)
+    : rankHeadlinerCandidates(entities, genreTagIds, band, exclude);
+  return pool.filter((entity) =>
+    eligibleAsAlternate(entity, band, headliner, relax),
   );
 }
 
