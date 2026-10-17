@@ -21,6 +21,7 @@ type Props = {
   pitch: PitchPayload;
   venue?: { lat: number; lon: number };
   className?: string;
+  wideFeed?: boolean;
 };
 
 function cityHintFromAddress(address: string): string | undefined {
@@ -32,7 +33,12 @@ function cityHintFromAddress(address: string): string | undefined {
   return parts[parts.length - 2];
 }
 
-export function AgentResultCard({ pitch, venue, className }: Props) {
+export function AgentResultCard({
+  pitch,
+  venue,
+  className,
+  wideFeed,
+}: Props) {
   const venueCity = cityHintFromAddress(pitch.address);
   const lineupLike = {
     venue: venue ? { ...venue, city: "Venue" } : undefined,
@@ -126,10 +132,17 @@ export function AgentResultCard({ pitch, venue, className }: Props) {
                 venue: lineupLike.venue,
                 neighborhoods: pitch.neighborhoods,
               }}
-              className="h-[200px]"
+              className={
+                wideFeed ? "h-[220px] md:h-[280px] xl:h-[320px]" : "h-[200px]"
+              }
             />
           )}
-          <ol className="grid sm:grid-cols-2 gap-x-4 gap-y-1 list-none text-sm">
+          <ol
+            className={cn(
+              "grid sm:grid-cols-2 gap-x-4 gap-y-1 list-none text-sm",
+              wideFeed && "lg:grid-cols-3",
+            )}
+          >
             {pitch.neighborhoods.map((n) => (
               <li key={n.rank} className="flex gap-2">
                 <span className="text-[#8c4a32]">{n.rank}.</span>
@@ -158,9 +171,20 @@ export function AgentResultCard({ pitch, venue, className }: Props) {
           <p className="text-[10px] uppercase tracking-[0.22em] text-[#6b5c52] mb-3">
             Bench
           </p>
-          <ul className="flex flex-wrap gap-4 list-none">
+          <ul
+            className={cn(
+              "flex flex-wrap list-none",
+              wideFeed ? "gap-5 lg:gap-6" : "gap-4",
+            )}
+          >
             {pitch.alternates.map((a) => (
-              <li key={a.id} className="flex flex-col items-center gap-1 w-16">
+              <li
+                key={a.id}
+                className={cn(
+                  "flex flex-col items-center gap-1",
+                  wideFeed ? "w-[5.25rem]" : "w-16",
+                )}
+              >
                 <ArtistPhoto
                   name={a.name}
                   imageUrl={a.imageUrl}

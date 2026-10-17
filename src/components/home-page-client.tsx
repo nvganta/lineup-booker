@@ -1,9 +1,13 @@
 "use client";
 
-import { AgentResultCard } from "@/components/agent-result-card";
-import { AgentStreamingPoster } from "@/components/agent-streaming-poster";
-import { LineupCard } from "@/components/lineup-card";
+import { AppShellTopBar } from "@/components/app-shell-top-bar";
+import { HowItWorksSection } from "@/components/how-it-works-section";
 import { LineupForm } from "@/components/lineup-form";
+import { LineupResultPane } from "@/components/lineup-result-pane";
+import {
+  LineupSampleRailDesktop,
+  LineupSampleRailMobile,
+} from "@/components/lineup-sample-rail";
 import { ScoutingLog } from "@/components/scouting-log";
 import {
   consumeAgentStream,
@@ -15,16 +19,14 @@ import {
 } from "@/lib/agent/stream-recover";
 import { EXAMPLE_VENUES } from "@/lib/example-venues";
 import type { LineupResult } from "@/lib/lineup/build-lineup";
+import {
+  pushRecentLineup,
+  type RecentLineup,
+} from "@/lib/recent-lineups";
 import type { LineupRequest } from "@/lib/lineup/schemas";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const DEFAULT_REQUEST: LineupRequest = EXAMPLE_VENUES[0]!.request;
-
-function PreviewSkeleton() {
-  return (
-    <div className="max-w-xl mx-auto rounded-sm border border-[#e8dfd6] bg-[#f7f2eb] p-5 animate-pulse min-h-[420px]" />
-  );
-}
 
 export function HomePageClient() {
   const [loading, setLoading] = useState(false);
@@ -34,6 +36,15 @@ export function HomePageClient() {
   const [openingSample, setOpeningSample] = useState<LineupResult | null>(null);
   const [openingLoading, setOpeningLoading] = useState(true);
   const [form, setForm] = useState<LineupRequest>(DEFAULT_REQUEST);
+  const [recentLineups, setRecentLineups] = useState<RecentLineup[]>([]);
+  const resultFeedRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    document.body.classList.add("lineup-app-shell");
+    return () => {
+      document.body.classList.remove("lineup-app-shell");
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,6 +62,11 @@ export function HomePageClient() {
       cancelled = true;
     };
   }, []);
+
+  function selectRequest(request: LineupRequest) {
+    setForm(request);
+    setAddressError(null);
+  }
 
   async function handleSubmit(data: LineupRequest) {
     setLoading(true);
@@ -86,7 +102,15 @@ export function HomePageClient() {
       }
       if (!streamState.pitch) {
         setError("Scout could not finish this run. Try again.");
+        return;
       }
+      setRecentLineups((prev) =>
+        pushRecentLineup(
+          prev,
+          data,
+          streamState.pitch?.venueLabel ?? undefined,
+        ),
+      );
     } catch {
       const recovered = await recoverIncompleteAgentStream(
         emptyAgentStreamState(),
@@ -95,17 +119,33 @@ export function HomePageClient() {
       );
       if (!recovered.pitch) {
         setError("Network error. Try again.");
+        return;
       }
+      setRecentLineups((prev) =>
+        pushRecentLineup(
+          prev,
+          data,
+          recovered.pitch?.venueLabel ?? undefined,
+        ),
+      );
     } finally {
       setLoading(false);
     }
   }
 
-  const pitch = agentState?.pitch;
-  const showPreview = !loading && !pitch && !error;
+  const railProps = {
+    samples: EXAMPLE_VENUES,
+    recent: recentLineups,
+    activeRequest: form,
+    onSelect: selectRequest,
+    disabled: loading,
+  };
+
+  const showScoutingLog =
+    loading || (agentState?.steps.length ?? 0) > 0;
 
   return (
-    <main className="min-h-full bg-[#faf7f2] flex-1">
+    <main className="relative flex flex-col bg-[#faf7f2] flex-1 max-lg:min-h-full lg:h-[100dvh] lg:max-h-[100dvh] lg:overflow-hidden">
       <div
         className="pointer-events-none fixed inset-0 opacity-[0.35] bg-[length:280px_280px] bg-repeat"
         style={{
@@ -114,68 +154,46 @@ export function HomePageClient() {
         aria-hidden
       />
 
-      <div className="relative mx-auto max-w-6xl px-5 py-12 md:py-16 lg:px-10">
-        <div className="grid gap-10 lg:gap-12 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] items-start">
-          <div className="space-y-8">
+      <AppShellTopBar />
+      <LineupSampleRailMobile {...railProps} />
+
+      <div className="relative z-10 flex flex-col lg:flex-row flex-1 min-h-0 max-lg:overflow-visible">
+        <LineupSampleRailDesktop {...railProps} />
+
+        <div className="flex flex-col lg:flex-row flex-1 min-h-0 max-lg:overflow-visible">
+          <div className="shrink-0 w-full lg:w-[20rem] xl:w-[22rem] lg:border-r border-[#e8dfd6] bg-[#faf7f2]/95 lg:overflow-y-auto lg:overscroll-contain px-4 py-5 lg:px-5 space-y-6">
             <LineupForm
               value={form}
               onChange={setForm}
               onSubmit={handleSubmit}
               loading={loading}
               addressError={addressError}
-              examples={EXAMPLE_VENUES}
-              onExampleSelect={(ex) => setForm(ex.request)}
             />
-            {(agentState?.steps.length ?? 0) > 0 && (
+            {showScoutingLog && agentState && (
               <ScoutingLog
-                steps={agentState!.steps}
-                summary={agentState!.summary}
+                steps={agentState.steps}
+                summary={agentState.summary}
               />
             )}
+            <div className="hidden lg:block">
+              <HowItWorksSection />
+            </div>
           </div>
 
-          <div className="lg:sticky lg:top-10 space-y-6 min-h-[320px]">
-            {error && (
-              <div
-                role="alert"
-                className="rounded-lg border border-[#e8dfd6] bg-[#fcf9f5] px-5 py-4 text-sm text-[#1a1614] max-w-xl"
-              >
-                {error}
-              </div>
-            )}
-
-            {loading && agentState && (
-              <AgentStreamingPoster
-                state={agentState}
-                venueConcept={form.concept}
-              />
-            )}
-
-            {loading && !agentState && (
-              <div
-                className="max-w-xl mx-auto rounded-sm border border-[#e8dfd6] bg-[#f7f2eb] p-6 min-h-[280px] flex items-center justify-center text-sm text-[#8a7f76]"
-                aria-busy="true"
-              >
-                Connecting to scout…
-              </div>
-            )}
-
-            {!loading && pitch && (
-              <div className="animate-lineup-settle">
-                <AgentResultCard
-                  pitch={pitch}
-                  venue={agentState?.map?.venue}
-                />
-              </div>
-            )}
-
-            {showPreview && openingLoading && <PreviewSkeleton />}
-
-            {showPreview && !openingLoading && openingSample && (
-              <LineupCard lineup={openingSample} preview />
-            )}
-          </div>
+          <LineupResultPane
+            loading={loading}
+            error={error}
+            agentState={agentState}
+            form={form}
+            openingSample={openingSample}
+            openingLoading={openingLoading}
+            scrollRef={resultFeedRef}
+          />
         </div>
+      </div>
+
+      <div className="lg:hidden px-4 pb-8 relative z-10">
+        <HowItWorksSection />
       </div>
     </main>
   );

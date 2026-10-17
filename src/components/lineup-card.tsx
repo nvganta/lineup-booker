@@ -22,9 +22,11 @@ type Props = {
   lineup: LineupResult;
   className?: string;
   preview?: boolean;
+  /** Full-width feed column (Layout B result pane). */
+  wideFeed?: boolean;
 };
 
-export function LineupCard({ lineup, className, preview }: Props) {
+export function LineupCard({ lineup, className, preview, wideFeed }: Props) {
   const noMatch = lineup.headliner.id === "no-headliner-match";
 
   return (
@@ -98,9 +100,20 @@ export function LineupCard({ lineup, className, preview }: Props) {
             <p className="text-[10px] uppercase tracking-[0.22em] text-[#6b5c52]">
               Also strong
             </p>
-            <ul className="flex flex-wrap gap-4 list-none">
+            <ul
+              className={cn(
+                "flex flex-wrap list-none",
+                wideFeed ? "gap-5 lg:gap-6" : "gap-4",
+              )}
+            >
               {lineup.alternates.map((a) => (
-                <li key={a.id} className="flex flex-col items-center gap-1.5 w-[4.5rem]">
+                <li
+                  key={a.id}
+                  className={cn(
+                    "flex flex-col items-center gap-1.5",
+                    wideFeed ? "w-[5.25rem]" : "w-[4.5rem]",
+                  )}
+                >
                   <ArtistPhoto
                     name={a.name}
                     imageUrl={a.imageUrl}
@@ -122,9 +135,21 @@ export function LineupCard({ lineup, className, preview }: Props) {
               Promote nearby
             </p>
             {lineup.venue && (
-              <LineupMap lineup={lineup} className="h-[200px] md:h-[220px]" />
+              <LineupMap
+                lineup={lineup}
+                className={
+                  wideFeed
+                    ? "h-[220px] md:h-[280px] xl:h-[320px]"
+                    : "h-[200px] md:h-[220px]"
+                }
+              />
             )}
-            <ol className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 list-none text-sm">
+            <ol
+              className={cn(
+                "grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 list-none text-sm",
+                wideFeed && "lg:grid-cols-3",
+              )}
+            >
               {lineup.neighborhoods.map((n) => (
                 <li key={n.rank} className="flex gap-2 items-baseline">
                   <span className="text-[#8c4a32] font-medium tabular-nums">

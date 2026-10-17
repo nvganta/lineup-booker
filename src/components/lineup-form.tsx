@@ -4,9 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { ExampleVenue } from "@/lib/example-venues";
 import type { LineupRequest } from "@/lib/lineup/schemas";
-import { cn } from "@/lib/utils";
 import { MapPin, Music2, UtensilsCrossed } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -16,8 +14,6 @@ type Props = {
   onSubmit: (data: LineupRequest) => void;
   loading: boolean;
   addressError?: string | null;
-  examples: ExampleVenue[];
-  onExampleSelect: (example: ExampleVenue) => void;
 };
 
 function FieldIcon({ children }: { children: ReactNode }) {
@@ -34,8 +30,6 @@ export function LineupForm({
   onSubmit,
   loading,
   addressError,
-  examples,
-  onExampleSelect,
 }: Props) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -43,36 +37,15 @@ export function LineupForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8 max-w-md">
-      <header className="space-y-2">
-        <p className="text-[11px] tracking-[0.28em] text-[#8c4a32] uppercase">
-          Lineup Booker
-        </p>
-        <h1 className="font-heading text-4xl md:text-[2.75rem] font-medium tracking-tight text-balance leading-[1.05] text-[#1a1614]">
+    <form onSubmit={handleSubmit} className="space-y-6 max-w-none">
+      <header className="space-y-1">
+        <h1 className="font-heading text-2xl xl:text-[1.75rem] font-medium tracking-tight text-balance leading-[1.08] text-[#1a1614]">
           Book the room they&apos;ll show up for
         </h1>
-        <p className="text-base text-[#6b5c52]">
-          One lineup—headliner, opener, neighborhoods.
+        <p className="text-sm text-[#6b5c52]">
+          Headliner, opener, neighborhoods.
         </p>
       </header>
-
-      <div className="flex flex-wrap gap-2">
-        {examples.map((ex) => (
-          <button
-            key={ex.label}
-            type="button"
-            disabled={loading}
-            onClick={() => onExampleSelect(ex)}
-            className={cn(
-              "rounded-full border border-[#e0d5ca] bg-[#fcf9f5] px-3 py-1.5",
-              "text-xs text-[#1a1614] hover:border-[#8c4a32]/40 hover:bg-[#f7f2eb]",
-              "transition-colors disabled:opacity-50",
-            )}
-          >
-            {ex.label}
-          </button>
-        ))}
-      </div>
 
       <div className="space-y-5">
         <div className="space-y-2">

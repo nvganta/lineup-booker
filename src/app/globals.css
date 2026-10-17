@@ -116,3 +116,14 @@
 .lineup-map-tiles .leaflet-tile-pane {
   filter: grayscale(1) sepia(0.15) contrast(0.9) brightness(1.05);
 }
+
+@media (min-width: 1024px) {
+  body.lineup-app-shell {
+    overflow: hidden;
+    height: 100dvh;
+  }
+
+  body.lineup-app-shell footer {
+    display: none;
+  }
+}
