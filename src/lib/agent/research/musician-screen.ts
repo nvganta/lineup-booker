@@ -33,7 +33,7 @@ async function wikipediaSummary(
 }
 
 /**
- * Bench-only: drop name collisions (e.g. a violinist who shares a name with a comics writer)
+ * Bench-only: drop name collisions (e.g. two different Fixture Ellis profiles)
  * and rows whose Wikipedia match is not clearly a musician.
  */
 export async function isVerifiedMusicianForBench(

@@ -274,6 +274,7 @@ export function createAgentResponse(body: unknown): Response {
         session: createEmptySession(),
         writer: sw,
         retries: 0,
+        lineupRequest: input,
       };
 
       sw.writeStep({
@@ -302,6 +303,9 @@ export function createAgentResponse(body: unknown): Response {
           }
           await finishAgentRun(input, runtime, sw);
         });
+        if (!runtime.session.pitch) {
+          await finishAgentRun(input, runtime, sw);
+        }
       } catch (err) {
         console.error("[agent] fatal", err);
         await runOutsideAgentRuntime(async () => {

@@ -9,6 +9,10 @@ import {
   consumeAgentStream,
   type AgentStreamState,
 } from "@/lib/agent/consume-agent-stream";
+import {
+  emptyAgentStreamState,
+  recoverIncompleteAgentStream,
+} from "@/lib/agent/stream-recover";
 import { EXAMPLE_VENUES } from "@/lib/example-venues";
 import type { LineupResult } from "@/lib/lineup/build-lineup";
 import type { LineupRequest } from "@/lib/lineup/schemas";
@@ -71,9 +75,27 @@ export function HomePageClient() {
         }
         return;
       }
-      await consumeAgentStream(res, setAgentState);
+      const consumed = await consumeAgentStream(res, setAgentState);
+      let streamState = consumed.state;
+      if (!consumed.terminal) {
+        streamState = await recoverIncompleteAgentStream(
+          streamState,
+          data,
+          setAgentState,
+        );
+      }
+      if (!streamState.pitch) {
+        setError("Scout could not finish this run. Try again.");
+      }
     } catch {
-      setError("Network error. Try again.");
+      const recovered = await recoverIncompleteAgentStream(
+        emptyAgentStreamState(),
+        data,
+        setAgentState,
+      );
+      if (!recovered.pitch) {
+        setError("Network error. Try again.");
+      }
     } finally {
       setLoading(false);
     }

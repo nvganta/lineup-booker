@@ -119,6 +119,28 @@ export async function researchFromMusicBrainz(
   });
 }
 
+/** Begin-area only (no release-group fetch). */
+export async function musicBrainzArtistBeginArea(
+  artistName: string,
+  hints?: ArtistResearchHints,
+  signal?: AbortSignal,
+): Promise<string | undefined> {
+  return scheduleMusicBrainz(async () => {
+    const fetch = getResearchFetch();
+    const q = encodeURIComponent(`artist:"${artistName}"`);
+    const searchUrl = `https://musicbrainz.org/ws/2/artist/?query=${q}&fmt=json&limit=8`;
+    const searchRes = await fetch(searchUrl, {
+      headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+      signal,
+    });
+    if (!searchRes.ok) return undefined;
+    const searchJson = (await searchRes.json()) as MbSearchResponse;
+    const hit = pickMbArtist(searchJson.artists ?? [], artistName, hints);
+    if (!hit) return undefined;
+    return hit["begin-area"]?.name ?? hit.area?.name;
+  });
+}
+
 /** @internal tests */
 export function resetMusicBrainzRateLimit(): void {
   lastMbAt = 0;

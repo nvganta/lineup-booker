@@ -50,7 +50,8 @@ describe("consumeAgentStream", () => {
     });
 
     const res = new Response(body);
-    const final = await consumeAgentStream(res, () => {});
+    const { state: final, terminal } = await consumeAgentStream(res, () => {});
+    expect(terminal).toBe(true);
     expect(final.steps).toHaveLength(1);
     expect(final.pitch?.headliner.name).toBe("Fixture Alpha");
   });

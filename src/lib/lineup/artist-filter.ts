@@ -147,6 +147,16 @@ export function qlooObscurityLevel(entity: QlooEntity): number | null {
   return null;
 }
 
+/** Openers in rooms ≤300 seats must stay within the room band popularity cap. */
+export function isOpenerTooFamousForSmallRoom(
+  entity: QlooEntity,
+  band: PopularityBand | undefined,
+): boolean {
+  if (!band?.seatCapacity || band.seatCapacity > 300) return false;
+  if ((entity.popularity ?? 0) > band.openerMax) return true;
+  return isTooFamousForSmallRoom(entity, band);
+}
+
 function isTooFamousForSmallRoom(
   entity: QlooEntity,
   band?: PopularityBand,
@@ -347,7 +357,7 @@ function withinPopularityBand(
   return true;
 }
 
-function rankHeadlinerPool(
+export function rankHeadlinerPool(
   entities: QlooEntity[],
   genreTagIds: string[],
   band?: PopularityBand,
@@ -407,28 +417,37 @@ export function rankAlternateHeadliners(
   );
 }
 
+export function headlinerPickOrder(
+  entities: QlooEntity[],
+  genreTagIds: string[],
+  band?: PopularityBand,
+  exclude: QlooEntity[] = [],
+): QlooEntity[] {
+  const ranked = rankHeadlinerPool(entities, genreTagIds, band, exclude);
+  if (ranked.length === 0) return [];
+
+  const inBand = band
+    ? ranked.filter((e) => withinPopularityBand(e, band))
+    : ranked;
+  if (inBand.length > 0) return inBand;
+
+  if (band?.headlinerMax !== undefined) {
+    const underMax = ranked.filter(
+      (e) => (e.popularity ?? 1) <= band.headlinerMax!,
+    );
+    if (underMax.length > 0) return underMax;
+  }
+
+  return ranked;
+}
+
 export function pickHeadliner(
   entities: QlooEntity[],
   genreTagIds: string[],
   band?: PopularityBand,
   exclude: QlooEntity[] = [],
 ): QlooEntity | undefined {
-  const ranked = rankHeadlinerPool(entities, genreTagIds, band, exclude);
-  if (ranked.length === 0) return undefined;
-
-  const inBand = band
-    ? ranked.filter((e) => withinPopularityBand(e, band))
-    : ranked;
-  if (inBand.length > 0) return inBand[0];
-
-  if (band?.headlinerMax !== undefined) {
-    const underMax = ranked.filter(
-      (e) => (e.popularity ?? 1) <= band.headlinerMax!,
-    );
-    if (underMax.length > 0) return underMax[0];
-  }
-
-  return ranked[0];
+  return headlinerPickOrder(entities, genreTagIds, band, exclude)[0];
 }
 
 /** @deprecated use pickHeadliner */

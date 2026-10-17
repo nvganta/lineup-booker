@@ -17,6 +17,10 @@ import {
 } from "@/lib/lineup/geography";
 import { openerPopularityMax } from "@/lib/lineup/opener-select";
 
+vi.mock("@/lib/lineup/artist-origin-sources", () => ({
+  gatherArtistOriginTexts: vi.fn(async () => ["Vancouver, British Columbia"]),
+}));
+
 type ProbeNeighborhoodRaw = {
   name: string;
   affinity?: number;
@@ -233,9 +237,9 @@ describe("pickOpener (no explainability overlap reject)", () => {
       candidates,
       headliner,
       "head",
-      "Vancouver",
+      { lat: 49.28, lon: -123.12, city: "Vancouver" },
       ["urn:tag:genre:music:folk"],
-      [],
+      { requests: [], localQueryCity: "Vancouver" },
     );
 
     expect(opener?.name).toBe("Fixture Opener Folk");

@@ -1,5 +1,8 @@
 import { pickHeadliner } from "./artist-filter";
-import { openerPopularityMax, pickOpener } from "./opener-select";
+import {
+  openerDiscoveryPopularityMax,
+  pickOpener,
+} from "./opener-select";
 import {
   discoverHeadliners,
   discoverOpeners,
@@ -44,7 +47,10 @@ export async function runProbe(input: LineupRequest) {
   }
 
   const headlinerId = headliner.entity_id ?? headliner.id ?? headliner.name;
-  const openerMax = openerPopularityMax(headliner.popularity ?? 0.9);
+  const openerMax = openerDiscoveryPopularityMax(
+    headliner.popularity ?? 0.9,
+    band,
+  );
 
   const [openerCandidates, heatmapData] = await Promise.all([
     discoverOpeners(signals, headlinerId, openerMax, requests),
@@ -65,9 +71,9 @@ export async function runProbe(input: LineupRequest) {
     openerCandidates,
     headliner,
     headlinerId,
-    signals.cityForHeatmap,
+    pin!,
     signals.musicTagIds,
-    requests,
+    { requests, band, localQueryCity: signals.cityForHeatmap },
   );
 
   const [gridResult, localityResult, openerPick] = await Promise.all([

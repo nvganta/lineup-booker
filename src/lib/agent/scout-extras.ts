@@ -6,7 +6,11 @@ import {
   fetchArtistHeatmap,
   fetchTagHeatmap,
 } from "@/lib/lineup/qloo-calls";
-import { pickOpener, openerPopularityMax } from "@/lib/lineup/opener-select";
+import {
+  openerDiscoveryPopularityMax,
+  pickOpener,
+} from "@/lib/lineup/opener-select";
+import { popularityBandFromConcept } from "@/lib/lineup/tiers";
 import { resolvePromoteNeighborhoods } from "@/lib/lineup/resolve-neighborhoods";
 import { qlooGet } from "@/lib/qloo/client";
 import type { QlooEntity, QlooInsightsResponse } from "@/lib/qloo/types";
@@ -31,7 +35,9 @@ export async function runScoutExtrasParallel(input: {
   if (!pin || !headlinerId) return;
 
   const headlinerPop = session.headlinerEntity?.popularity ?? 0.9;
-  const popMax = openerPopularityMax(headlinerPop);
+  const band =
+    session.band ?? popularityBandFromConcept(input.concept);
+  const popMax = openerDiscoveryPopularityMax(headlinerPop, band);
   const signals = headlinerDiscoverySignals(
     pin,
     input.address,
@@ -58,9 +64,13 @@ export async function runScoutExtrasParallel(input: {
         candidates,
         headlinerEntity,
         headlinerId,
-        pin.city,
+        pin,
         input.tagIds,
-        requests,
+        {
+          requests,
+          band,
+          localQueryCity: signals.cityForHeatmap,
+        },
       );
       const opener = pick.opener
         ? await attachImageUrl(pick.opener, requests)

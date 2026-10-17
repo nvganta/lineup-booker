@@ -12,7 +12,7 @@ export function normalizeArtistName(name: string): string {
     .replace(/\s+/g, " ");
 }
 
-/** "Fixture Artist (musician)" → "fixture artist"; "The Fixture Band" → "fixture band". */
+/** "Fixture Beta (musician)" → "fixture beta"; "The Fixture Luna Band" → "fixture luna band". */
 function comparableName(name: string): string {
   return normalizeArtistName(name.replace(/\s*\([^)]*\)\s*$/, "")).replace(
     /^the /,
@@ -23,7 +23,7 @@ function comparableName(name: string): string {
 /**
  * Exact name match only (ignoring case, punctuation, a leading "The" and a
  * Wikipedia disambiguation suffix). Substring or first/last-name matches
- * pulled in other people, e.g. "Fixture" → "Fixture Alpha".
+ * pulled in other people, e.g. "Fixture" → "Fixture Touring Act".
  */
 export function namesMatch(candidateTitle: string, artistName: string): boolean {
   const a = comparableName(artistName);

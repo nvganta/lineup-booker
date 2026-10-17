@@ -16,10 +16,14 @@ import {
 } from "@/lib/agent/verdicts";
 import { attachImageUrl, artistImageFromEntity } from "@/lib/agent/lookup-artist";
 import { discoverHeadliners, discoverOpeners, fetchArtistHeatmap, fetchTagHeatmap } from "@/lib/lineup/qloo-calls";
-import { pickHeadliner, rankAlternateHeadliners } from "@/lib/lineup/artist-filter";
+import { selectBenchEntities } from "@/lib/lineup/bench-select";
+import { pickHeadlinerForVenue } from "@/lib/lineup/headliner-local-pick";
 import { resolveMusicGenreTags } from "@/lib/lineup/genre-tags";
 import { resolvePromoteNeighborhoods } from "@/lib/lineup/resolve-neighborhoods";
-import { pickOpener, openerPopularityMax } from "@/lib/lineup/opener-select";
+import {
+  openerDiscoveryPopularityMax,
+  pickOpener,
+} from "@/lib/lineup/opener-select";
 import { popularityBandFromConcept, widenPopularityBand } from "@/lib/lineup/tiers";
 import { qlooGet } from "@/lib/qloo/client";
 import type { QlooEntity, QlooInsightsResponse } from "@/lib/qloo/types";
@@ -29,9 +33,9 @@ import type { AgentSessionState, PitchPayload, ToolVerdict } from "@/lib/agent/t
 type AlternateDto = PitchPayload["alternates"][number];
 import { validatePitchPayload } from "@/lib/agent/pitch-validator";
 import { runScoutExtrasParallel } from "@/lib/agent/scout-extras";
+import { emitSalvagedPitchIfReady } from "@/lib/agent/salvage-pitch";
+import type { LineupRequest } from "@/lib/lineup/schemas";
 import { hintsFromQlooEntity } from "@/lib/agent/research/qloo-hints";
-import { filterActorFirstEntities } from "@/lib/agent/research/actor-screen";
-import { filterVerifiedMusicianBench } from "@/lib/agent/research/musician-screen";
 import {
   assemblePitchWhyLines,
   buildPitchWhyCatalog,
@@ -61,6 +65,25 @@ function rt() {
   const runtime = getAgentRuntime();
   if (!runtime) throw new Error("Agent runtime missing");
   return runtime;
+}
+
+function agentLineupRequest(): LineupRequest {
+  const runtime = rt();
+  if (runtime.lineupRequest) return runtime.lineupRequest;
+  return {
+    concept: runtime.session.pin?.city ?? "Venue",
+    location: "",
+    regularsLove: runtime.session.tagLabels.join(", ") || "live music",
+  };
+}
+
+function agentRunStats() {
+  const runtime = rt();
+  return {
+    elapsedSec: runtime.budget.elapsedSec(),
+    qlooLookups: runtime.budget.qlooCalls,
+    retries: runtime.retries,
+  };
 }
 
 function blockRefine(strategy: RefineStrategy) {
@@ -467,7 +490,12 @@ export function buildAgentTools(): ToolSet {
           band,
           requests,
         );
-        const picked = pickHeadliner(artists, safeTagIds, band);
+        const picked = await pickHeadlinerForVenue(
+          artists,
+          safeTagIds,
+          band,
+          pin,
+        );
         const enriched: QlooEntity[] = [];
         for (const a of artists.slice(0, 8)) {
           enriched.push(await attachImageUrl(a, requests));
@@ -497,52 +525,27 @@ export function buildAgentTools(): ToolSet {
           });
         }
         if (picked && pickedEnriched) {
-          let benchBand = band;
-          let ranked = rankAlternateHeadliners(
+          const openerId = rt().session.openerEntity?.id;
+          const benchExclude = [picked];
+          if (openerId) {
+            const openerEntity = artists.find(
+              (a) => (a.entity_id ?? a.id) === openerId,
+            );
+            if (openerEntity) benchExclude.push(openerEntity);
+          }
+          const benchPool = await selectBenchEntities(
             artists,
             safeTagIds,
-            benchBand,
+            band,
             picked,
-            [picked],
+            benchExclude,
+            (e) => hintsFromQlooEntity(e),
+            4,
           );
-          if (ranked.length === 0 && rt().session.widenLevel < 1) {
-            // Widen for the bench only; session.widenLevel drives the
-            // "slightly bigger than your room" note, which is about the headliner.
-            benchBand = widenPopularityBand(benchBand, 1);
-            ranked = rankAlternateHeadliners(
-              artists,
-              safeTagIds,
-              benchBand,
-              picked,
-              [picked],
-            );
-          }
-          if (ranked.length === 0 && (benchBand.seatCapacity ?? 999) <= 120) {
-            benchBand = widenPopularityBand(benchBand, 2);
-            ranked = rankAlternateHeadliners(
-              artists,
-              safeTagIds,
-              benchBand,
-              picked,
-              [picked],
-              {
-                relaxObscurityForTinyRoom: true,
-                relaxBandCapForBench: true,
-              },
-            );
-          }
-          ranked = await filterActorFirstEntities(ranked, (e) =>
-            hintsFromQlooEntity(e),
-          );
-          ranked = await filterVerifiedMusicianBench(ranked, (e) =>
-            hintsFromQlooEntity(e),
-          );
-          const openerId = rt().session.openerEntity?.id;
           const alternates: AlternateDto[] = [];
-          for (const candidate of ranked) {
+          for (const candidate of benchPool) {
             const cid = candidate.entity_id ?? candidate.id;
             if (cid && openerId && cid === openerId) continue;
-            if (alternates.length >= 4) break;
             const withImage = await attachImageUrl(candidate, requests);
             alternates.push({
               id: withImage.entity_id ?? withImage.id ?? withImage.name,
@@ -583,7 +586,7 @@ export function buildAgentTools(): ToolSet {
         concept: z.string(),
         address: z.string(),
       }),
-      execute: async ({ headlinerId, tagIds, address, why }) => {
+      execute: async ({ headlinerId, tagIds, concept, address, why }) => {
         const done = alreadyScouted();
         if (done) return done;
         const { id, t0 } = stepStart("opener", why);
@@ -617,7 +620,9 @@ export function buildAgentTools(): ToolSet {
         }
         const requests: ProvenanceRequest[] = [];
         const headlinerPop = rt().session.headlinerEntity?.popularity ?? 0.9;
-        const popMax = openerPopularityMax(headlinerPop);
+        const band =
+          rt().session.band ?? popularityBandFromConcept(concept);
+        const popMax = openerDiscoveryPopularityMax(headlinerPop, band);
         const signals = headlinerDiscoverySignals(
           pin,
           address,
@@ -636,14 +641,32 @@ export function buildAgentTools(): ToolSet {
           name: rt().session.headlinerEntity?.name ?? "Headliner",
           popularity: headlinerPop,
         } satisfies QlooEntity;
-        const pick = await pickOpener(
-          candidates,
-          headlinerEntity,
-          headlinerId,
-          pin.city,
-          safeTagIds,
-          requests,
-        );
+        let pick: Awaited<ReturnType<typeof pickOpener>>;
+        try {
+          pick = await pickOpener(
+            candidates,
+            headlinerEntity,
+            headlinerId,
+            pin,
+            safeTagIds,
+            {
+              requests,
+              band,
+              localQueryCity: signals.cityForHeatmap,
+            },
+          );
+        } catch (err) {
+          console.error("[agent] discover_openers failed", err);
+          await emitSalvagedPitchIfReady(
+            rt().session,
+            agentLineupRequest(),
+            rt().writer,
+            agentRunStats(),
+          );
+          const fail: ToolVerdict = { level: "weak", reasons: ["opener_step_error"] };
+          stepEnd(id, t0, "opener", why, fail);
+          return { verdict: fail, opener: null };
+        }
         const opener = pick.opener
           ? await attachImageUrl(pick.opener, requests)
           : null;
@@ -872,7 +895,17 @@ export function buildAgentTools(): ToolSet {
         } else {
           ids = resolved.tagIds;
         }
-        await runScoutExtrasParallel({ concept, address, tagIds: ids });
+        try {
+          await runScoutExtrasParallel({ concept, address, tagIds: ids });
+        } catch (err) {
+          console.error("[agent] scout_after_headliner failed", err);
+          await emitSalvagedPitchIfReady(
+            session,
+            agentLineupRequest(),
+            rt().writer,
+            agentRunStats(),
+          );
+        }
         session.extrasScouted = true;
         const verdict: ToolVerdict = {
           level: session.neighborhoods.length >= 2 ? "good" : "weak",

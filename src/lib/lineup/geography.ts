@@ -368,8 +368,80 @@ export function sameBoroughAsPin(
   return !cellBorough || cellBorough === venueBorough;
 }
 
+function nycCityLabel(city: string): boolean {
+  const c = canonicalCityLabel(city);
+  return c === "new york" || c === "new york city";
+}
+
+function isOriginAdminOrCountryPart(part: string): boolean {
+  const trimmed = part.trim();
+  if (!trimmed) return true;
+  if (isBroadRegion(trimmed)) return true;
+  const lower = trimmed.toLowerCase();
+  if (
+    lower === "canadian" ||
+    lower === "american" ||
+    lower === "british" ||
+    lower === "australian"
+  ) {
+    return true;
+  }
+  if (/^[a-z]{2}$/.test(lower)) return true;
+  return false;
+}
+
+function originLocalityParts(origin: string): string[] {
+  return origin
+    .split(/[,/]/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .filter((p) => !isOriginAdminOrCountryPart(p));
+}
+
+function exactVenueLocalityMatch(part: string, pin: VenuePin): boolean {
+  const canonical = canonicalCityLabel(part);
+  if (!canonical) return false;
+  for (const raw of [
+    pin.homeNeighborhood,
+    pin.suburb,
+    pin.borough,
+    pin.city_district,
+    pin.county ? boroughFromCounty(pin.county) : undefined,
+  ]) {
+    if (!raw) continue;
+    if (canonicalCityLabel(String(raw)) === canonical) return true;
+  }
+  return false;
+}
+
+export function artistOriginMatchesVenue(
+  origin: string | undefined,
+  pin: VenuePin,
+): boolean {
+  if (!origin?.trim()) return false;
+  const parts = originLocalityParts(origin);
+  if (parts.length === 0) return false;
+
+  const borough = promotionBoroughForPin(pin);
+
+  for (const part of parts) {
+    if (cityLabelsEquivalent(part, pin.city)) return true;
+    if (exactVenueLocalityMatch(part, pin)) return true;
+    if (nycCityLabel(part) && nycCityLabel(pin.city) && !borough) return true;
+    const partBorough = normalizeBorough(part, pin.city);
+    if (borough && partBorough === borough) return true;
+  }
+
+  return false;
+}
+
 export function isVenueCityName(name: string, pin: VenuePin): boolean {
   return cityLabelsEquivalent(name, pin.city);
+}
+
+/** Ridings and paired-place admin labels (en/em dash); ASCII hyphens are kept. */
+export function promoLabelHasEnOrEmDash(name: string): boolean {
+  return /[\u2013\u2014]/.test(name.trim());
 }
 
 /** Housing estates, city borough rows, and other non-neighbourhood locality labels. */
@@ -378,6 +450,7 @@ export function isNonPromotableNeighborhoodLabel(
   pin: VenuePin,
   disambiguation?: string,
 ): boolean {
+  if (promoLabelHasEnOrEmDash(name)) return true;
   if (isBroadRegion(name, disambiguation)) return true;
   if (isMacroAdminNeighborhoodName(name)) return true;
   if (isVenueCityName(name, pin)) return true;

@@ -5,6 +5,12 @@ import type {
   PitchPayload,
   StepDataPart,
 } from "./types";
+import {
+  agentStreamHasTerminalEvent,
+  type AgentStreamConsumeResult,
+} from "./stream-recover";
+
+export type { AgentStreamConsumeResult };
 
 export type AgentStreamState = {
   steps: StepDataPart[];
@@ -47,9 +53,11 @@ function applyChunk(state: AgentStreamState, chunk: unknown): void {
 export async function consumeAgentStream(
   response: Response,
   onUpdate: (state: AgentStreamState) => void,
-): Promise<AgentStreamState> {
+): Promise<AgentStreamConsumeResult> {
   const state = createAgentStreamState();
-  if (!response.body) return state;
+  if (!response.body) {
+    return { state, terminal: agentStreamHasTerminalEvent(state) };
+  }
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -79,5 +87,5 @@ export async function consumeAgentStream(
       }
     }
   }
-  return state;
+  return { state, terminal: agentStreamHasTerminalEvent(state) };
 }

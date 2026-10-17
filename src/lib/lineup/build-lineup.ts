@@ -1,13 +1,11 @@
-import { filterActorFirstEntities } from "@/lib/agent/research/actor-screen";
-import { filterVerifiedMusicianBench } from "@/lib/agent/research/musician-screen";
 import { hintsFromQlooEntity } from "@/lib/agent/research/qloo-hints";
 import type { QlooEntity } from "@/lib/qloo/types";
+import { selectBenchEntities } from "./bench-select";
+import { pickHeadlinerForVenue } from "./headliner-local-pick";
 import {
-  isSamePerson,
-  pickHeadliner,
-  rankAlternateHeadliners,
-} from "./artist-filter";
-import { openerPopularityMax, pickOpener } from "./opener-select";
+  openerDiscoveryPopularityMax,
+  pickOpener,
+} from "./opener-select";
 import {
   discoverHeadliners,
   discoverOpeners,
@@ -20,7 +18,6 @@ import type { LineupRequest } from "./schemas";
 import {
   popularityBandFromConcept,
   tierLabel,
-  widenPopularityBand,
 } from "./tiers";
 import { resolveVenueSignals, type ProvenanceRequest } from "./translate-venue";
 import { venueDisplayName } from "./venue-display";
@@ -104,10 +101,11 @@ export async function buildLineup(input: LineupRequest): Promise<LineupResult> {
 
   const { artists: headlinerCandidates, qlooReturnedCount } =
     await discoverHeadliners(signals, band, requests);
-  const headlinerEntity = pickHeadliner(
+  const headlinerEntity = await pickHeadlinerForVenue(
     headlinerCandidates,
     signals.musicTagIds,
     band,
+    pin,
   );
 
   if (!headlinerEntity) {
@@ -148,7 +146,10 @@ export async function buildLineup(input: LineupRequest): Promise<LineupResult> {
   }
 
   const headlinerId = entityId(headlinerEntity);
-  const openerMax = openerPopularityMax(headlinerEntity.popularity ?? 0.9);
+  const openerMax = openerDiscoveryPopularityMax(
+    headlinerEntity.popularity ?? 0.9,
+    band,
+  );
 
   const [openerCandidates, heatmapData] = await Promise.all([
     discoverOpeners(signals, headlinerId, openerMax, requests),
@@ -161,9 +162,9 @@ export async function buildLineup(input: LineupRequest): Promise<LineupResult> {
     openerCandidates,
     headlinerEntity,
     headlinerId,
-    signals.cityForHeatmap,
+    pin,
     signals.musicTagIds,
-    requests,
+    { requests, band, localQueryCity: signals.cityForHeatmap },
   );
 
   const neighborhoodsPromise = resolvePromoteNeighborhoods(
@@ -188,44 +189,15 @@ export async function buildLineup(input: LineupRequest): Promise<LineupResult> {
   const excludeFromAlternates = [headlinerEntity];
   if (openerEntity) excludeFromAlternates.push(openerEntity);
 
-  let benchBand = band;
-  let ranked = rankAlternateHeadliners(
+  const benchPool = await selectBenchEntities(
     headlinerCandidates,
     signals.musicTagIds,
-    benchBand,
+    band,
     headlinerEntity,
     excludeFromAlternates,
-  ).filter(
-    (e) =>
-      entityId(e) !== headlinerId &&
-      (!openerEntity || !isSamePerson(e, openerEntity)),
+    (e) => hintsFromQlooEntity(e),
   );
-  if (ranked.length === 0 && (benchBand.seatCapacity ?? 999) <= 120) {
-    benchBand = widenPopularityBand(benchBand, 2);
-    ranked = rankAlternateHeadliners(
-      headlinerCandidates,
-      signals.musicTagIds,
-      benchBand,
-      headlinerEntity,
-      excludeFromAlternates,
-      { relaxObscurityForTinyRoom: true, relaxBandCapForBench: true },
-    ).filter(
-      (e) =>
-        entityId(e) !== headlinerId &&
-        (!openerEntity || !isSamePerson(e, openerEntity)),
-    );
-  }
-  // Same Wikipedia actor-first screen the agent bench uses (Quick mode
-  // was still showing actor-first acts on the bench).
-  let benchPool = await filterActorFirstEntities(ranked.slice(0, 5), (e) =>
-    hintsFromQlooEntity(e),
-  );
-  benchPool = await filterVerifiedMusicianBench(benchPool, (e) =>
-    hintsFromQlooEntity(e),
-  );
-  const alternates = benchPool
-    .slice(0, 3)
-    .map((e, i) => toArtist(e, i + 2, "headliner"));
+  const alternates = benchPool.map((e, i) => toArtist(e, i + 2, "headliner"));
 
   return {
     venueLabel: venueDisplayName(input.concept),

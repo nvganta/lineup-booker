@@ -68,7 +68,7 @@ async function searchWikiTitles(
   return [...new Set(titles)];
 }
 
-function originFromExtract(extract: string): string | undefined {
+export function originFromExtract(extract: string): string | undefined {
   const born = extract.match(/\bborn in ([^,.]+(?:,\s*[^,.]+)?)/i);
   if (born?.[1]) return born[1].trim();
   const from = extract.match(/\bfrom ([^,.]+(?:,\s*[^,.]+)?)/i);

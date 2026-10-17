@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { AgentBudget } from "./budget";
+import type { LineupRequest } from "@/lib/lineup/schemas";
 import type { AgentSessionState, StreamWriter } from "./types";
 
 export type AgentRuntime = {
@@ -7,6 +8,7 @@ export type AgentRuntime = {
   session: AgentSessionState;
   writer: StreamWriter;
   retries: number;
+  lineupRequest?: LineupRequest;
 };
 
 export const agentRuntimeStorage = new AsyncLocalStorage<AgentRuntime>();
