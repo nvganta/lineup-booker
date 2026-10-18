@@ -52,7 +52,7 @@ export function LineupCard({ lineup, className, preview, wideFeed }: Props) {
             variant="outline"
             className="shrink-0 rounded-full border-[#d4c4b5] text-[#6b5c52] text-[10px] uppercase tracking-wider bg-[#fcf9f5]"
           >
-            Sample
+            Saved run
           </Badge>
         )}
       </div>
@@ -73,9 +73,6 @@ export function LineupCard({ lineup, className, preview, wideFeed }: Props) {
                 <p className="text-[10px] uppercase tracking-[0.22em] text-[#6b5c52]">
                   Opener
                 </p>
-                <Badge className="rounded-full bg-[#8c4a32]/10 text-[#8c4a32] border-0 text-[10px] uppercase tracking-wide hover:bg-[#8c4a32]/10">
-                  Local
-                </Badge>
               </div>
               <p className="font-heading text-xl leading-tight mt-0.5">
                 {lineup.opener.name}

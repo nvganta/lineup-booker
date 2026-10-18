@@ -1,10 +1,12 @@
 "use client";
 
-import { AgentResultCard } from "@/components/agent-result-card";
+import { AgentScoutStream } from "@/components/agent-scout-stream";
 import { AgentStreamingPoster } from "@/components/agent-streaming-poster";
-import { LineupCard } from "@/components/lineup-card";
+import { LineupPosterCard } from "@/components/lineup-poster-card";
 import type { AgentStreamState } from "@/lib/agent/consume-agent-stream";
+import type { PitchPayload } from "@/lib/agent/types";
 import type { LineupResult } from "@/lib/lineup/build-lineup";
+import { lineupResultToPitch } from "@/lib/lineup/lineup-to-pitch";
 import {
   FEED_BLOCK_CLASS,
   FEED_CARD_CLASS,
@@ -17,7 +19,7 @@ function PreviewSkeleton() {
     <div
       className={cn(
         FEED_BLOCK_CLASS,
-        "rounded-sm border border-[#e8dfd6] bg-[#f7f2eb] p-5 animate-pulse min-h-[420px]",
+        "rounded-sm border border-[#e8dfd6] bg-[#f7f2eb] p-5 min-h-[420px]",
       )}
     />
   );
@@ -30,6 +32,7 @@ type Props = {
   form: LineupRequest;
   openingSample: LineupResult | null;
   openingLoading: boolean;
+  savedPitch: PitchPayload | null;
   className?: string;
   scrollRef?: React.RefObject<HTMLElement | null>;
 };
@@ -41,10 +44,11 @@ export function LineupResultPane({
   form,
   openingSample,
   openingLoading,
+  savedPitch,
   className,
   scrollRef,
 }: Props) {
-  const pitch = agentState?.pitch;
+  const pitch = savedPitch ?? agentState?.pitch;
   const showPreview = !loading && !pitch && !error;
 
   return (
@@ -52,7 +56,7 @@ export function LineupResultPane({
       ref={scrollRef as React.RefObject<HTMLElement>}
       data-result-feed
       className={cn(
-        "min-w-0 space-y-6",
+        "min-w-0 space-y-4",
         "lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:px-6 lg:py-6 xl:px-8",
         "max-lg:px-4 max-lg:pb-10 max-lg:pt-2",
         className,
@@ -71,11 +75,17 @@ export function LineupResultPane({
       )}
 
       {loading && agentState && (
-        <AgentStreamingPoster
-          state={agentState}
-          venueConcept={form.concept}
-          className={FEED_CARD_CLASS}
-        />
+        <div className={FEED_BLOCK_CLASS}>
+          <AgentScoutStream
+            steps={agentState.steps}
+            className="mb-4"
+          />
+          <AgentStreamingPoster
+            state={agentState}
+            venueConcept={form.concept}
+            className={FEED_CARD_CLASS}
+          />
+        </div>
       )}
 
       {loading && !agentState && (
@@ -91,12 +101,20 @@ export function LineupResultPane({
       )}
 
       {!loading && pitch && (
-        <div className={cn("animate-lineup-settle", FEED_BLOCK_CLASS)}>
-          <AgentResultCard
+        <div className={FEED_BLOCK_CLASS}>
+          <AgentScoutStream
+            steps={agentState?.steps ?? []}
+            summary={agentState?.summary}
+            collapsedDefault
+            className="mb-4"
+          />
+          <LineupPosterCard
+            key={`${pitch.headliner.id}:${pitch.opener?.id ?? "none"}:${pitch.address}`}
             pitch={pitch}
             venue={agentState?.map?.venue}
             className={FEED_CARD_CLASS}
             wideFeed
+            animateSettle
           />
         </div>
       )}
@@ -105,11 +123,20 @@ export function LineupResultPane({
 
       {showPreview && !openingLoading && openingSample && (
         <div className={FEED_BLOCK_CLASS}>
-          <LineupCard
-            lineup={openingSample}
-            preview
+          <LineupPosterCard
+            key={`saved:${openingSample.headliner.id}`}
+            pitch={lineupResultToPitch(openingSample, form)}
+            venue={
+              openingSample.venue
+                ? {
+                    lat: openingSample.venue.lat,
+                    lon: openingSample.venue.lon,
+                  }
+                : undefined
+            }
+            previewBadge="saved-run"
+            className={FEED_CARD_CLASS}
             wideFeed
-            className={cn(FEED_CARD_CLASS, "scale-100 opacity-100")}
           />
         </div>
       )}

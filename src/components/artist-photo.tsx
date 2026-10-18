@@ -1,6 +1,7 @@
 "use client";
 
 import { artistMonogram } from "@/lib/artist-monogram";
+import { proxiedImageUrl } from "@/lib/image-proxy";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
@@ -18,7 +19,8 @@ export function ArtistPhoto({
   rounded = "md",
 }: Props) {
   const [failed, setFailed] = useState(false);
-  const showImage = imageUrl && !failed;
+  const src = proxiedImageUrl(imageUrl);
+  const showImage = src && !failed;
   const radius =
     rounded === "full"
       ? "rounded-full"
@@ -37,8 +39,9 @@ export function ArtistPhoto({
       {showImage ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={imageUrl}
+          src={src}
           alt={name}
+          data-poster-image-key={imageUrl ?? name}
           className="h-full w-full object-cover"
           loading="lazy"
           onError={() => setFailed(true)}

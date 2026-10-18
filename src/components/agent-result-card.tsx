@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { ArtistPhoto } from "@/components/artist-photo";
 import { HeadlinerHero } from "@/components/headliner-hero";
 import type { PitchPayload } from "@/lib/agent/types";
+import { formatCrowdDisplay } from "@/lib/lineup/crowd-display";
 import { stripCityFromNeighborhoodLabel } from "@/lib/lineup/neighborhood-display";
 import { cn } from "@/lib/utils";
 
@@ -72,11 +73,10 @@ export function AgentResultCard({
           imageUrl: pitch.headliner.imageUrl,
         }}
         noMatch={false}
+        whyLine={pitch.headlinerWhy}
       />
-      {/* Why + background share one block so the divider sits under both. */}
-      <div className="px-5 py-3 border-b border-[#e8dfd6] space-y-1.5">
-        <p className="text-sm text-[#5c534d]">{pitch.headlinerWhy}</p>
-        {pitch.headliner.background?.line && (
+      {pitch.headliner.background?.line && (
+        <div className="px-5 py-3 border-b border-[#e8dfd6]">
           <p className="text-xs leading-relaxed text-[#8a7f76]">
             {pitch.headliner.background.line}{" "}
             <a
@@ -88,8 +88,8 @@ export function AgentResultCard({
               {pitch.headliner.background.sourceName}
             </a>
           </p>
-        )}
-      </div>
+        </div>
+      )}
 
       {pitch.opener && (
         <section className="px-5 py-4 flex gap-3 items-center border-b border-[#e8dfd6]">
@@ -160,9 +160,9 @@ export function AgentResultCard({
         </section>
       )}
 
-      {pitch.crowdLine?.trim() && (
+      {formatCrowdDisplay(pitch.crowdDemographics) && (
         <p className="px-5 py-4 text-sm text-[#5c534d] border-b border-[#e8dfd6]">
-          {pitch.crowdLine}
+          {formatCrowdDisplay(pitch.crowdDemographics)}
         </p>
       )}
 

@@ -8,6 +8,7 @@ import {
   headlinerFitLine,
   openerLocalLine,
 } from "./pitch-catalog";
+import { buildPitchMetaFromSession } from "./pitch-meta";
 import {
   homeNeighborhoodFromPin,
   prependHomeToPromoteList,
@@ -42,11 +43,13 @@ export function pitchFromAgentSession(
     headlinerWhy: headlinerFitLine(session),
     openerWhy:
       openerLocalLine(session) ?? "No local opener stood out this time.",
-    crowdLine: session.crowdLine,
+    crowdDemographics: session.crowdDemographics ?? null,
     headliner,
     opener: session.openerEntity ?? null,
     alternates: withoutOpener(session),
     neighborhoods,
+    openerSwapQueue: session.openerSwapQueue,
+    meta: buildPitchMetaFromSession(session, input),
     evidenceFootnotes: {
       mode: "Quick mode using the scout's cached picks.",
     },

@@ -98,19 +98,25 @@
   }
 }
 
-@keyframes lineup-settle {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
+@media (min-width: 1024px) and (min-height: 860px) {
+  .ui-poster-compact .ui-poster-bench {
+    padding-top: 0;
+    padding-bottom: 0;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  .ui-poster-compact .ui-poster-map {
+    padding-top: 0;
+    padding-bottom: 0.125rem;
   }
-}
-
-.animate-lineup-settle {
-  animation: lineup-settle 0.55s ease-out both;
+  .ui-poster-compact .ui-poster-map-legend {
+    display: none;
+  }
+  .ui-poster-compact .ui-poster-bench ul {
+    gap: 0.5rem;
+  }
+  .ui-poster-compact .ui-poster-bench .h-8 {
+    height: 1.75rem;
+    width: 1.75rem;
+  }
 }
 
 .lineup-map-tiles .leaflet-tile-pane {

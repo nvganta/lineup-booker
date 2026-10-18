@@ -197,7 +197,6 @@ export function validatePitchPayload(
     pitch.moodLine,
     pitch.headlinerWhy,
     pitch.openerWhy,
-    pitch.crowdLine ?? "",
     pitch.widenRoomNote ?? "",
   ].join(" ");
 

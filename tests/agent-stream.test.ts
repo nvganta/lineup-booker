@@ -8,7 +8,6 @@ const minimalPitch: PitchPayload = {
   moodLine: "Fixture mood",
   headlinerWhy: "Fixture Alpha fits.",
   openerWhy: "Fixture Beta opens.",
-  crowdLine: "Mixed crowd.",
   headliner: { id: "h1", name: "Fixture Alpha" },
   opener: null,
   alternates: [],

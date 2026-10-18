@@ -2,6 +2,7 @@ import { getCachedArtistBackground } from "@/lib/agent/research/cache";
 import { researchOneArtist } from "@/lib/agent/research/research-artists";
 import type { ArtistResearchHints } from "@/lib/agent/research/types";
 import { originFromExtract } from "@/lib/agent/research/wikipedia";
+import { isPlausiblePlaceOrigin } from "@/lib/lineup/origin-place";
 
 function normalizeOrigin(text: string): string {
   return text.replace(/\s+/g, " ").trim();
@@ -24,7 +25,9 @@ export async function gatherArtistOriginTexts(
 
   const push = (raw: string | undefined) => {
     if (!raw?.trim()) return;
-    found.add(normalizeOrigin(raw));
+    const normalized = normalizeOrigin(raw);
+    if (!isPlausiblePlaceOrigin(normalized)) return;
+    found.add(normalized);
   };
 
   if (hints?.description) {

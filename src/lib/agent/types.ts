@@ -1,4 +1,5 @@
 import type { LineupResult } from "@/lib/lineup/build-lineup";
+import type { CrowdDemographics } from "@/lib/lineup/pitch-analytics";
 import type { PopularityBand } from "@/lib/lineup/tiers";
 import type { VenuePin } from "@/lib/lineup/geography";
 
@@ -67,7 +68,8 @@ export type PitchPayload = {
   moodLine: string;
   headlinerWhy: string;
   openerWhy: string;
-  crowdLine?: string;
+  /** UI-only; not validated in owner copy (see crowdDemographics). */
+  crowdDemographics?: CrowdDemographics | null;
   widenRoomNote?: string;
   alternates: Array<{ id: string; name: string; imageUrl?: string }>;
   headliner: {
@@ -93,6 +95,31 @@ export type PitchPayload = {
   venueLabel: string;
   address: string;
   evidenceFootnotes: Record<string, string>;
+  /** Next-best openers from scout audit (real rejection reasons). */
+  openerSwapQueue?: Array<{
+    id: string;
+    name: string;
+    imageUrl?: string;
+    reason: string;
+    popularity?: number;
+  }>;
+  meta?: {
+    cityQuery?: string;
+    countryQuery?: string;
+    cityLabel?: string;
+    concept?: string;
+    regularsLove?: string;
+    musicTagIds?: string[];
+    openerOriginMatchesCity?: boolean;
+    openerOriginByActId?: Record<string, boolean>;
+    headlinerPoolSize?: number;
+    headlinerRankInPool?: number;
+    headlinerPopularity?: number;
+    openerPopularity?: number;
+    tagLabels?: string[];
+    /** Stable opener pick copy keyed by act id (survives swap). */
+    openerPickLinesByActId?: Record<string, string>;
+  };
 };
 
 export type AgentFinishSummary = {
@@ -110,15 +137,33 @@ export type AgentSessionState = {
   tagOperator: "union" | "intersection";
   headlinerId?: string;
   headlinerEntity?: { id: string; name: string; imageUrl?: string; popularity?: number };
-  openerEntity?: { id: string; name: string; imageUrl?: string };
+  openerEntity?: {
+    id: string;
+    name: string;
+    imageUrl?: string;
+    popularity?: number;
+  };
+  openerOriginMatchesCity?: boolean;
+  headlinerPoolSize?: number;
+  headlinerRankInPool?: number;
   neighborhoods: PitchPayload["neighborhoods"];
-  crowdLine?: string;
+  crowdDemographics?: CrowdDemographics | null;
   widenLevel: 0 | 1 | 2;
   tagDiscoveryCalls?: number;
   openerDiscoverCalls?: number;
   /** Set once scout_after_headliner has run, so the model can't redo its work. */
   extrasScouted?: boolean;
   alternateEntities?: PitchPayload["alternates"];
+  openerSwapQueue?: PitchPayload["openerSwapQueue"];
+  openerAudit?: Array<{
+    name: string;
+    id: string;
+    popularity?: number;
+    kept: boolean;
+    originMatch?: boolean;
+    hasLocalSignal: boolean;
+    reason: string;
+  }>;
   refineUsed: Set<string>;
   knownTagIds: Set<string>;
   knownNames: Set<string>;

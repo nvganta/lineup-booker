@@ -1,14 +1,13 @@
 "use client";
 
 import { AppShellTopBar } from "@/components/app-shell-top-bar";
-import { HowItWorksSection } from "@/components/how-it-works-section";
+import { HowItWorksDialog } from "@/components/how-it-works-dialog";
 import { LineupForm } from "@/components/lineup-form";
 import { LineupResultPane } from "@/components/lineup-result-pane";
 import {
   LineupSampleRailDesktop,
   LineupSampleRailMobile,
 } from "@/components/lineup-sample-rail";
-import { ScoutingLog } from "@/components/scouting-log";
 import {
   consumeAgentStream,
   type AgentStreamState,
@@ -17,14 +16,21 @@ import {
   emptyAgentStreamState,
   recoverIncompleteAgentStream,
 } from "@/lib/agent/stream-recover";
+import type { PitchPayload } from "@/lib/agent/types";
 import { EXAMPLE_VENUES } from "@/lib/example-venues";
 import type { LineupResult } from "@/lib/lineup/build-lineup";
-import {
-  pushRecentLineup,
-  type RecentLineup,
-} from "@/lib/recent-lineups";
 import type { LineupRequest } from "@/lib/lineup/schemas";
-import { useEffect, useRef, useState } from "react";
+import {
+  cityFromRequest,
+  getServerStoredLineups,
+  loadStoredLineups,
+  storedLineupId,
+  subscribeStoredLineups,
+  toggleStoredPin,
+  upsertStoredLineup,
+  type StoredLineup,
+} from "@/lib/stored-lineups";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 const DEFAULT_REQUEST: LineupRequest = EXAMPLE_VENUES[0]!.request;
 
@@ -36,7 +42,13 @@ export function HomePageClient() {
   const [openingSample, setOpeningSample] = useState<LineupResult | null>(null);
   const [openingLoading, setOpeningLoading] = useState(true);
   const [form, setForm] = useState<LineupRequest>(DEFAULT_REQUEST);
-  const [recentLineups, setRecentLineups] = useState<RecentLineup[]>([]);
+  const storedLineups = useSyncExternalStore(
+    subscribeStoredLineups,
+    loadStoredLineups,
+    getServerStoredLineups,
+  );
+  const [savedPitch, setSavedPitch] = useState<PitchPayload | null>(null);
+  const [howOpen, setHowOpen] = useState(false);
   const resultFeedRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -66,6 +78,40 @@ export function HomePageClient() {
   function selectRequest(request: LineupRequest) {
     setForm(request);
     setAddressError(null);
+    setSavedPitch(null);
+    setAgentState(null);
+    setError(null);
+  }
+
+  function openStored(item: StoredLineup) {
+    setForm(item.request);
+    setSavedPitch(item.pitch);
+    setAgentState(null);
+    setError(null);
+    setAddressError(null);
+  }
+
+  function handleNewLineup() {
+    setForm(DEFAULT_REQUEST);
+    setSavedPitch(null);
+    setAgentState(null);
+    setError(null);
+    setAddressError(null);
+    setLoading(false);
+  }
+
+  function persistPitch(request: LineupRequest, pitch: PitchPayload) {
+    const entry: StoredLineup = {
+      id: storedLineupId(request, pitch),
+      venueLabel: pitch.venueLabel,
+      cityLabel: pitch.meta?.cityLabel ?? cityFromRequest(request),
+      headlinerName: pitch.headliner.name,
+      headlinerImageUrl: pitch.headliner.imageUrl,
+      request,
+      pitch,
+      savedAt: Date.now(),
+    };
+    upsertStoredLineup(entry);
   }
 
   async function handleSubmit(data: LineupRequest) {
@@ -73,6 +119,7 @@ export function HomePageClient() {
     setError(null);
     setAddressError(null);
     setAgentState(null);
+    setSavedPitch(null);
     try {
       const res = await fetch("/api/agent", {
         method: "POST",
@@ -104,13 +151,7 @@ export function HomePageClient() {
         setError("Scout could not finish this run. Try again.");
         return;
       }
-      setRecentLineups((prev) =>
-        pushRecentLineup(
-          prev,
-          data,
-          streamState.pitch?.venueLabel ?? undefined,
-        ),
-      );
+      persistPitch(data, streamState.pitch);
     } catch {
       const recovered = await recoverIncompleteAgentStream(
         emptyAgentStreamState(),
@@ -121,13 +162,7 @@ export function HomePageClient() {
         setError("Network error. Try again.");
         return;
       }
-      setRecentLineups((prev) =>
-        pushRecentLineup(
-          prev,
-          data,
-          recovered.pitch?.venueLabel ?? undefined,
-        ),
-      );
+      persistPitch(data, recovered.pitch);
     } finally {
       setLoading(false);
     }
@@ -135,14 +170,15 @@ export function HomePageClient() {
 
   const railProps = {
     samples: EXAMPLE_VENUES,
-    recent: recentLineups,
+    stored: storedLineups,
     activeRequest: form,
-    onSelect: selectRequest,
+    onSelectRequest: selectRequest,
+    onOpenStored: openStored,
+    onTogglePin: (id: string) => {
+      toggleStoredPin(id);
+    },
     disabled: loading,
   };
-
-  const showScoutingLog =
-    loading || (agentState?.steps.length ?? 0) > 0;
 
   return (
     <main className="relative flex flex-col bg-[#faf7f2] flex-1 max-lg:min-h-full lg:h-[100dvh] lg:max-h-[100dvh] lg:overflow-hidden">
@@ -154,14 +190,18 @@ export function HomePageClient() {
         aria-hidden
       />
 
-      <AppShellTopBar />
+      <AppShellTopBar
+        onHowItWorks={() => setHowOpen(true)}
+        onNewLineup={handleNewLineup}
+      />
+      <HowItWorksDialog open={howOpen} onClose={() => setHowOpen(false)} />
       <LineupSampleRailMobile {...railProps} />
 
       <div className="relative z-10 flex flex-col lg:flex-row flex-1 min-h-0 max-lg:overflow-visible">
         <LineupSampleRailDesktop {...railProps} />
 
         <div className="flex flex-col lg:flex-row flex-1 min-h-0 max-lg:overflow-visible">
-          <div className="shrink-0 w-full lg:w-[20rem] xl:w-[22rem] lg:border-r border-[#e8dfd6] bg-[#faf7f2]/95 lg:overflow-y-auto lg:overscroll-contain px-4 py-5 lg:px-5 space-y-6">
+          <div className="shrink-0 w-full lg:w-[20rem] xl:w-[22rem] lg:border-r border-[#e8dfd6] bg-[#faf7f2]/95 lg:overflow-hidden px-4 py-5 lg:px-5">
             <LineupForm
               value={form}
               onChange={setForm}
@@ -169,15 +209,6 @@ export function HomePageClient() {
               loading={loading}
               addressError={addressError}
             />
-            {showScoutingLog && agentState && (
-              <ScoutingLog
-                steps={agentState.steps}
-                summary={agentState.summary}
-              />
-            )}
-            <div className="hidden lg:block">
-              <HowItWorksSection />
-            </div>
           </div>
 
           <LineupResultPane
@@ -187,13 +218,10 @@ export function HomePageClient() {
             form={form}
             openingSample={openingSample}
             openingLoading={openingLoading}
+            savedPitch={savedPitch}
             scrollRef={resultFeedRef}
           />
         </div>
-      </div>
-
-      <div className="lg:hidden px-4 pb-8 relative z-10">
-        <HowItWorksSection />
       </div>
     </main>
   );

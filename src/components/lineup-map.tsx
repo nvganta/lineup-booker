@@ -103,18 +103,22 @@ function FitBounds({
 }) {
   const map = useMap();
   useEffect(() => {
-    const [vLat, vLon] = venueMarkerLatLng(venue, neighborhoods);
-    const points: L.LatLngExpression[] = [
-      [vLat, vLon],
-      ...neighborhoods
-        .filter((n) => n.lat != null && n.lon != null)
-        .map((n) => [n.lat!, n.lon!] as L.LatLngExpression),
-    ];
-    if (points.length < 2) {
-      map.setView([venue.lat, venue.lon], 13);
+    const pinPoints: L.LatLngExpression[] = neighborhoods
+      .filter((n) => n.lat != null && n.lon != null)
+      .map((n) => [n.lat!, n.lon!] as L.LatLngExpression);
+    if (pinPoints.length >= 2) {
+      // The card map is a short strip, so keep vertical padding just
+      // larger than half a pin and let zoom snap in quarter steps.
+      map.invalidateSize();
+      map.fitBounds(L.latLngBounds(pinPoints), {
+        paddingTopLeft: [24, 16],
+        paddingBottomRight: [24, 16],
+        maxZoom: 15,
+      });
       return;
     }
-    map.fitBounds(L.latLngBounds(points), { padding: [32, 32], maxZoom: 14 });
+    const [vLat, vLon] = venueMarkerLatLng(venue, neighborhoods);
+    map.setView([vLat, vLon], 14);
   }, [map, venue, neighborhoods]);
   return null;
 }
@@ -140,6 +144,7 @@ export function LineupMap({ lineup, className }: Props) {
       <MapContainer
         center={[venue.lat, venue.lon]}
         zoom={13}
+        zoomSnap={0.25}
         scrollWheelZoom={false}
         dragging={false}
         doubleClickZoom={false}
@@ -147,8 +152,11 @@ export function LineupMap({ lineup, className }: Props) {
         boxZoom={false}
         keyboard={false}
         zoomControl={false}
+        zoomAnimation={false}
+        fadeAnimation={false}
+        markerZoomAnimation={false}
         className="h-full w-full rounded-md border border-[#e8dfd6] bg-[#f3ece4] [&_.leaflet-control-attribution]:text-[9px] [&_.leaflet-control-attribution]:text-[#8a7f76]"
-        style={{ minHeight: 200 }}
+        style={{ minHeight: 72 }}
       >
         <TileLayer
           attribution={MAP_TILE_ATTRIBUTION}

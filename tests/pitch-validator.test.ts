@@ -22,7 +22,6 @@ describe("validatePitchPayload", () => {
       moodLine: "Fixture Alpha brings the room up without overselling.",
       headlinerWhy: "Fixture Alpha matches indie folk tags at your pin.",
       openerWhy: "Fixture Beta has local overlap.",
-      crowdLine: "Listeners nearby skew toward your regulars.",
     });
     expect(result.ok).toBe(true);
   });
@@ -33,7 +32,6 @@ describe("validatePitchPayload", () => {
       moodLine: "Main Street energy without a stadium bill.",
       headlinerWhy: "Fixture Alpha fits Vancouver rooms like yours.",
       openerWhy: "Fixture Beta opens.",
-      crowdLine: "Mixed crowd near Main St.",
     });
     expect(result.ok).toBe(true);
   });
@@ -45,7 +43,6 @@ describe("validatePitchPayload", () => {
       moodLine: "DJ Fixture fits a late set.",
       headlinerWhy: "DJ Fixture ranks on your tags.",
       openerWhy: "Fixture Beta opens.",
-      crowdLine: "Fjöra Fixture listeners overlap nearby.",
       alternates: [{ id: "a1", name: "Fjöra Fixture" }],
     });
     expect(result.ok).toBe(true);
@@ -57,7 +54,6 @@ describe("validatePitchPayload", () => {
       moodLine: "Surprise guest Zed Zeppelin appears.",
       headlinerWhy: "Fixture Alpha fits.",
       openerWhy: "Fixture Beta opens.",
-      crowdLine: "Mixed crowd.",
     });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toBe("unknown_entities");
@@ -69,7 +65,6 @@ describe("validatePitchPayload", () => {
       moodLine: "A warm night.",
       headlinerWhy: "Fixture Alpha brings emotive vocals to your room.",
       openerWhy: "Fixture Beta opens.",
-      crowdLine: "Mixed crowd.",
     });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toBe("subjective_claims");
@@ -81,7 +76,6 @@ describe("validatePitchPayload", () => {
       moodLine: "This will sell out guaranteed.",
       headlinerWhy: "Fixture Alpha fits.",
       openerWhy: "Fixture Beta opens.",
-      crowdLine: "Mixed crowd.",
     });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toBe("forbidden_forecast_language");
@@ -100,7 +94,6 @@ describe("validatePitchPayload owner-facing copy", () => {
         moodLine: "A warm night.",
         headlinerWhy: leak,
         openerWhy: "Fixture Beta opens.",
-        crowdLine: "Mixed crowd.",
       });
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.reason).toBe("internal_jargon");

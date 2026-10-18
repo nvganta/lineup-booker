@@ -25,28 +25,6 @@ vi.mock("@/lib/agent/research/actor-screen", () => ({
   isActorFirstByWikipedia: vi.fn(async () => false),
 }));
 
-vi.mock("@/lib/qloo/client", () => ({
-  qlooGet: vi.fn(async (_path: string, params: Record<string, string>) => {
-    const resultsId = params["filter.results.entities"];
-    const localIds = new Set([
-      "opener-brooklyn-a",
-      "opener-london-a",
-      "room-fit-local",
-    ]);
-    return {
-      data: {
-        results: {
-          entities:
-            resultsId && localIds.has(resultsId)
-              ? [{ entity_id: resultsId, name: "local" }]
-              : [],
-        },
-      },
-      request: { method: "GET", path: "/v2/insights", query: "" },
-    };
-  }),
-}));
-
 function headliner(pop = 0.7): QlooEntity {
   return {
     name: "Fixture Headliner",
@@ -59,7 +37,7 @@ function headliner(pop = 0.7): QlooEntity {
 }
 
 describe("opener pick without origin data", () => {
-  it("uses Qloo local-in-city signal when research has no origin text", async () => {
+  it("still picks from opener pool when no origin on file", async () => {
     const candidates: QlooEntity[] = [
       {
         name: "Fixture Opener Brooklyn A",
@@ -70,7 +48,7 @@ describe("opener pick without origin data", () => {
         tags: [tag],
       },
     ];
-    const { opener } = await pickOpener(
+    const { opener, swapCandidates } = await pickOpener(
       candidates,
       headliner(),
       "head",
@@ -84,28 +62,7 @@ describe("opener pick without origin data", () => {
       { requests: [], localQueryCity: "New York" },
     );
     expect(opener?.entity_id).toBe("opener-brooklyn-a");
-  });
-
-  it("uses Qloo local signal when no origin text is available", async () => {
-    const candidates: QlooEntity[] = [
-      {
-        name: "Fixture Opener London A",
-        entity_id: "opener-london-a",
-        popularity: 0.5,
-        type: "artist",
-        subtype: "urn:entity:artist",
-        tags: [tag],
-      },
-    ];
-    const { opener } = await pickOpener(
-      candidates,
-      headliner(),
-      "head",
-      { lat: 51.523, lon: -0.075, city: "London", borough: "Hackney" },
-      genreTags,
-      { requests: [], localQueryCity: "London" },
-    );
-    expect(opener?.entity_id).toBe("opener-london-a");
+    expect(swapCandidates.length).toBeGreaterThanOrEqual(1);
   });
 });
 
@@ -154,7 +111,7 @@ describe("opener room popularity cap (≤300 seats)", () => {
     ).toBe(true);
   });
 
-  it("rejects when research origin is out of market even if Qloo shows local taste", async () => {
+  it("rejects when research origin is out of market", async () => {
     const candidates: QlooEntity[] = [
       {
         name: "Fixture Opener Prairie Signal",

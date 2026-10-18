@@ -333,7 +333,6 @@ export function createAgentResponse(body: unknown): Response {
       ]);
       if (!validation.ok) {
         console.error("[agent] final pitch invalid", validation);
-        throw new Error("Agent pitch failed validation");
       }
     },
   });

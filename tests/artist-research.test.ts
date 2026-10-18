@@ -106,7 +106,6 @@ describe("pitch validator research facts", () => {
       headlinerWhy:
         "Fixture Alpha matches tags; Victoria-born since 2005 with Fixture Album One in the catalog.",
       openerWhy: "Fixture Beta opens.",
-      crowdLine: "Mixed crowd.",
       headliner: {
         id: "h1",
         name: "Fixture Alpha",

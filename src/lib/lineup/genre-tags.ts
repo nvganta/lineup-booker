@@ -77,7 +77,7 @@ export async function resolveMusicGenreTags(
     if (!top || seenIds.has(top.id)) continue;
     seenIds.add(top.id);
     ids.push(top.id);
-    labels.push(top.name);
+    labels.push((top.name ?? "").replace(/\s+/g, " ").trim());
   }
 
   if (ids.length < 2) {
@@ -98,7 +98,7 @@ export async function resolveMusicGenreTags(
         if (!id || seenIds.has(id)) continue;
         seenIds.add(id);
         ids.push(id);
-        labels.push(tag.name ?? id);
+        labels.push(String(tag.name ?? id).replace(/\s+/g, " ").trim());
       }
     }
   }

@@ -3,7 +3,7 @@ import { headlinerDiscoverySignals } from "@/lib/agent/qloo-signals";
 import { dedupeTagsByLabel } from "@/lib/agent/tag-labels";
 import {
   bookerStepLabel,
-  formatStepEvidence,
+  humanizeVerdictReason,
   type StepNoteContext,
 } from "@/lib/agent/step-copy";
 import { getAgentRuntime, withoutOpener } from "@/lib/agent/runtime";
@@ -16,6 +16,7 @@ import {
 } from "@/lib/agent/verdicts";
 import { attachImageUrl, artistImageFromEntity } from "@/lib/agent/lookup-artist";
 import { discoverHeadliners, discoverOpeners, fetchArtistHeatmap, fetchTagHeatmap } from "@/lib/lineup/qloo-calls";
+import { headlinerPickOrder } from "@/lib/lineup/artist-filter";
 import { selectBenchEntities } from "@/lib/lineup/bench-select";
 import { pickHeadlinerForVenue } from "@/lib/lineup/headliner-local-pick";
 import { resolveMusicGenreTags } from "@/lib/lineup/genre-tags";
@@ -24,14 +25,19 @@ import {
   openerDiscoveryPopularityMax,
   pickOpener,
 } from "@/lib/lineup/opener-select";
+import { persistOpenerPickToSession } from "@/lib/lineup/opener-session";
+import { fetchHeadlinerDemographics } from "@/lib/lineup/demographics-qloo";
 import { popularityBandFromConcept, widenPopularityBand } from "@/lib/lineup/tiers";
 import { qlooGet } from "@/lib/qloo/client";
 import type { QlooEntity, QlooInsightsResponse } from "@/lib/qloo/types";
 import type { ProvenanceRequest } from "@/lib/lineup/translate-venue";
 import type { VenuePin } from "@/lib/lineup/geography";
-import type { AgentSessionState, PitchPayload, ToolVerdict } from "@/lib/agent/types";
+import type { PitchPayload, ToolVerdict } from "@/lib/agent/types";
 type AlternateDto = PitchPayload["alternates"][number];
+import { buildPitchMetaFromSession } from "@/lib/agent/pitch-meta";
 import { validatePitchPayload } from "@/lib/agent/pitch-validator";
+import { formatCrowdDisplay } from "@/lib/lineup/crowd-display";
+import { displayCityLabelFromGeocode } from "@/lib/geocode/nominatim";
 import { runScoutExtrasParallel } from "@/lib/agent/scout-extras";
 import { emitSalvagedPitchIfReady } from "@/lib/agent/salvage-pitch";
 import type { LineupRequest } from "@/lib/lineup/schemas";
@@ -112,33 +118,23 @@ function stepStart(
   const id = crypto.randomUUID();
   const t0 = Date.now();
   const session = rt().session;
+  const runningLabel =
+    kind === "pitch"
+      ? "Writing the pitch for the room."
+      : bookerStepLabel(kind, {
+          session,
+          modelWhy,
+          verdict: { level: "good", reasons: [] },
+          ...noteCtx,
+        });
   rt().writer.writeStep({
     id,
     kind,
     status: "running",
-    label: bookerStepLabel(kind, {
-      session,
-      modelWhy,
-      verdict: { level: "good", reasons: [] },
-      ...noteCtx,
-    }),
+    label: runningLabel,
     why: modelWhy,
   });
   return { id, t0 };
-}
-
-/** Plain-language note for "How I got here" when promo areas used a fallback. */
-function promoSourceNote(session: AgentSessionState): string | undefined {
-  const meta = session.neighborhoodResolveMeta;
-  if (!meta?.usedTagHeatmap && !meta?.usedRingFallback) return undefined;
-  const parts: string[] = [];
-  if (meta.usedTagHeatmap) {
-    parts.push("some areas come from where fans of these genres cluster");
-  }
-  if (meta.usedRingFallback) {
-    parts.push("some are simply the neighbourhoods closest to the room");
-  }
-  return `The headliner's own fan map was thin here, so ${parts.join(", and ")}.`;
 }
 
 function stepEnd(
@@ -162,8 +158,11 @@ function stepEnd(
       ...noteCtx,
     }),
     why: modelWhy,
-    detail: detailNote ?? (verdict.reasons.join(", ") || undefined),
-    evidence: formatStepEvidence(verdict.evidence),
+    detail:
+      detailNote ??
+      (verdict.reasons.length
+        ? verdict.reasons.map(humanizeVerdictReason).join(" ")
+        : undefined),
     elapsedSec: Math.max(1, Math.round((Date.now() - t0) / 1000)),
   });
 }
@@ -183,7 +182,6 @@ function alreadyScouted() {
     verdict: { level: "good", reasons: ["already_scouted"] } as ToolVerdict,
     opener: session.openerEntity?.name ?? null,
     neighborhoods: session.neighborhoods.map((n) => n.name),
-    crowdLine: session.crowdLine ?? null,
     next: "scout_after_headliner already covered this. Call compose_pitch now.",
   };
 }
@@ -238,6 +236,7 @@ function pinFromGeocode(
     lat: hit.lat,
     lon: hit.lon,
     city: hit.cityForHeatmap,
+    displayCity: displayCityLabelFromGeocode(hit),
     state: hit.state,
     country: hit.country,
     county: hit.county,
@@ -368,7 +367,9 @@ export function buildAgentTools(): ToolSet {
         const regulars = phrases.join(", ");
         const resolved = await resolveMusicGenreTags(regulars, concept, requests);
         rt().session.tagIds = resolved.ids;
-        rt().session.tagLabels = resolved.labels;
+        rt().session.tagLabels = resolved.labels.map((l) =>
+          l.replace(/\s+/g, " ").trim(),
+        );
         registerKnownTagIds(resolved.ids);
         const verdict = verdictTags(phrases.length, resolved.ids.length);
         stepEnd(id, t0, "tags", why, verdict, { tagLabels: resolved.labels });
@@ -503,9 +504,17 @@ export function buildAgentTools(): ToolSet {
         const pickedEnriched = picked
           ? await attachImageUrl(picked, requests)
           : null;
-        if (pickedEnriched) {
+        const pool = headlinerPickOrder(artists, safeTagIds, band, []);
+        if (pickedEnriched && picked) {
           registerArtist(pickedEnriched);
           rt().session.headlinerId = pickedEnriched.entity_id ?? pickedEnriched.id;
+          rt().session.headlinerPoolSize = pool.length;
+          const pickKey = picked.entity_id ?? picked.id;
+          const rankIdx = pool.findIndex(
+            (a) => (a.entity_id ?? a.id) === pickKey,
+          );
+          rt().session.headlinerRankInPool =
+            rankIdx >= 0 ? rankIdx + 1 : undefined;
           rt().session.headlinerEntity = {
             id: rt().session.headlinerId!,
             name: pickedEnriched.name,
@@ -562,7 +571,7 @@ export function buildAgentTools(): ToolSet {
           safeTagIds,
         );
         stepEnd(id, t0, "headliner", why, verdict, {
-          headlinerCount: qlooReturnedCount,
+          headlinerCount: rt().session.headlinerPoolSize ?? pool.length,
         });
         return {
           verdict,
@@ -670,15 +679,16 @@ export function buildAgentTools(): ToolSet {
         const opener = pick.opener
           ? await attachImageUrl(pick.opener, requests)
           : null;
-        const hasLocal = pick.audit.some((a) => a.kept && a.hasLocalSignal);
+        const hasLocal = pick.audit.some((a) => a.kept && a.originMatch);
+        await persistOpenerPickToSession(
+          rt().session,
+          pick,
+          opener,
+          requests,
+        );
         if (opener) {
           registerArtist(opener);
-          const openerDto = {
-            id: opener.entity_id ?? opener.id ?? opener.name,
-            name: opener.name,
-            imageUrl: artistImageFromEntity(opener),
-          };
-          rt().session.openerEntity = openerDto;
+          const openerDto = rt().session.openerEntity!;
           rt().writer.writeArtist({
             id: openerDto.id,
             name: openerDto.name,
@@ -816,29 +826,23 @@ export function buildAgentTools(): ToolSet {
         const done = alreadyScouted();
         if (done) return done;
         const { id, t0 } = stepStart("crowd", why);
-        const { data, request } = await qlooGet<QlooInsightsResponse>(
-          "/v2/insights",
-          {
-            "filter.type": "urn:demographics",
-            "signal.interests.entities": artistId,
-            take: 5,
-          },
+        const pin = rt().session.pin;
+        const requests: ProvenanceRequest[] = [];
+        const { demographics } = await fetchHeadlinerDemographics(
+          artistId,
+          pin?.city,
+          requests,
         );
-        void request;
-        const entities = data.results?.entities ?? [];
-        const ageBand = entities.find((e) =>
-          /^\d+\s*[-–]\s*\d+/.test(e.name ?? ""),
-        );
-        if (ageBand?.name) {
-          rt().session.crowdLine = `Listeners nearby skew toward ages ${ageBand.name}.`;
-        } else {
-          rt().session.crowdLine = undefined;
-        }
+        rt().session.crowdDemographics = demographics;
+        const crowdLabel = formatCrowdDisplay(demographics);
         stepEnd(id, t0, "crowd", why, {
-          level: ageBand ? "good" : "weak",
-          reasons: ageBand ? [] : ["thin_demographics"],
+          level: crowdLabel ? "good" : "weak",
+          reasons: crowdLabel ? [] : ["thin_demographics"],
         });
-        return { crowdLine: rt().session.crowdLine, top: ageBand?.name };
+        return {
+          crowdDisplay: crowdLabel,
+          demographics,
+        };
       },
     }),
 
@@ -880,13 +884,10 @@ export function buildAgentTools(): ToolSet {
         address: z.string(),
         tagIds: z.array(z.string()).optional(),
       }),
-      execute: async ({ concept, address, tagIds, why }) => {
-        const { id, t0 } = stepStart("opener", why);
+      execute: async ({ concept, address, tagIds }) => {
         const session = rt().session;
         if (!session.headlinerId) {
-          const fail: ToolVerdict = { level: "fail", reasons: ["no_headliner"] };
-          stepEnd(id, t0, "opener", why, fail);
-          return { verdict: fail };
+          return { verdict: { level: "fail", reasons: ["no_headliner"] } };
         }
         let ids = tagIds?.length ? tagIds : session.tagIds;
         const resolved = resolveTagIdsForDiscovery(ids);
@@ -912,12 +913,10 @@ export function buildAgentTools(): ToolSet {
           reasons: [],
           evidence: { neighborhoods: session.neighborhoods.length },
         };
-        stepEnd(id, t0, "opener", why, verdict, undefined, promoSourceNote(session));
         return {
           verdict,
           opener: session.openerEntity?.name ?? null,
           neighborhoods: session.neighborhoods.map((n) => n.name),
-          crowdLine: session.crowdLine ?? null,
           next: "Call compose_pitch now with this evidence.",
         };
       },
@@ -960,6 +959,17 @@ export function buildAgentTools(): ToolSet {
           const fail: ToolVerdict = { level: "fail", reasons: ["no_headliner"] };
           stepEnd(id, t0, "pitch", why, fail);
           return { verdict: fail };
+        }
+        if (session.pitch) {
+          const catalog = buildPitchWhyCatalog(session);
+          return {
+            verdict: { level: "good", reasons: [] },
+            pitch: session.pitch,
+            artistBackgrounds: {},
+            headlinerWhySlots: catalog.headlinerSlotIds,
+            openerWhySlots: catalog.openerSlotIds,
+            next: "Pitch is already locked — finish the run.",
+          };
         }
         const backgrounds = await flushArtistResearch(session, RESEARCH_TOTAL_MS);
         if (Object.keys(backgrounds).length && !session.artistResearchLogged) {
@@ -1014,13 +1024,24 @@ export function buildAgentTools(): ToolSet {
 
         const { id, t0 } = stepStart("pitch", why);
 
+        const lineupReq = agentLineupRequest();
+        const pitchMeta = buildPitchMetaFromSession(session, lineupReq);
+        const openerWhyResolved =
+          session.openerEntity?.id &&
+          pitchMeta.openerPickLinesByActId?.[session.openerEntity.id]
+            ? pitchMeta.openerPickLinesByActId[session.openerEntity.id]!
+            : openerWhy;
+        // Show the venue as the user typed it; the model sometimes drops
+        // the capacity on one run and keeps it on the next.
+        const typedConcept = rt().lineupRequest?.concept?.trim();
         let pitch: PitchPayload = {
-          venueLabel,
+          venueLabel:
+            typedConcept && typedConcept.length <= 80 ? typedConcept : venueLabel,
           address,
           moodLine,
           headlinerWhy,
-          openerWhy,
-          crowdLine: session.crowdLine,
+          openerWhy: openerWhyResolved,
+          crowdDemographics: session.crowdDemographics ?? null,
           widenRoomNote:
             widenRoomNote ??
             (session.widenLevel > 0
@@ -1030,9 +1051,11 @@ export function buildAgentTools(): ToolSet {
           opener: session.openerEntity ?? null,
           alternates: withoutOpener(session),
           neighborhoods: session.neighborhoods,
+          openerSwapQueue: session.openerSwapQueue,
+          meta: pitchMeta,
           evidenceFootnotes: {
             headliner: headlinerWhy.slice(0, 120),
-            opener: openerWhy.slice(0, 120),
+            opener: openerWhyResolved.slice(0, 120),
             ...researchSourceFootnotes(backgrounds),
           },
         };

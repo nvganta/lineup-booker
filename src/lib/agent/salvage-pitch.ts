@@ -16,6 +16,7 @@ import {
   headlinerFitLine,
   openerLocalLine,
 } from "./pitch-catalog";
+import { buildPitchMetaFromSession } from "./pitch-meta";
 
 export function salvagePitch(
   session: AgentSessionState,
@@ -39,11 +40,13 @@ export function salvagePitch(
     openerWhy:
       openerLocalLine(session) ??
       "No local opener stood out yet, so lock the headliner first.",
-    crowdLine: session.crowdLine,
+    crowdDemographics: session.crowdDemographics ?? null,
     headliner,
     opener: session.openerEntity ?? null,
     alternates: withoutOpener(session),
     neighborhoods: promoNeighborhoodsWithHomeFirst(session),
+    openerSwapQueue: session.openerSwapQueue,
+    meta: buildPitchMetaFromSession(session, input),
     evidenceFootnotes: { mode: "Salvaged from scout evidence." },
   };
 

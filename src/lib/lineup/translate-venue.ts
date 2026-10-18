@@ -1,4 +1,5 @@
 import {
+  displayCityLabelFromGeocode,
   geocodeWithRetries,
   toSignalLocationPoint,
 } from "@/lib/geocode/nominatim";
@@ -81,6 +82,7 @@ export async function resolveVenueSignals(
     lat: geocode.lat,
     lon: geocode.lon,
     city: cityForHeatmap,
+    displayCity: displayCityLabelFromGeocode(geocode),
     state: geocode.state,
     country: geocode.country,
     county: geocode.county,

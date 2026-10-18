@@ -11,6 +11,8 @@ export type VenuePin = {
   lat: number;
   lon: number;
   city: string;
+  /** Human city for UI (e.g. London, not a street line). */
+  displayCity?: string;
   state?: string;
   country?: string;
   county?: string;
@@ -373,6 +375,194 @@ function nycCityLabel(city: string): boolean {
   return c === "new york" || c === "new york city";
 }
 
+const NYC_BOROUGHS = new Set([
+  "brooklyn",
+  "manhattan",
+  "queens",
+  "bronx",
+  "staten island",
+  "the bronx",
+]);
+
+const LONDON_BOROUGHS = new Set([
+  "hackney",
+  "tower hamlets",
+  "camden",
+  "islington",
+  "southwark",
+  "lambeth",
+  "westminster",
+  "kensington and chelsea",
+  "hammersmith and fulham",
+  "wandsworth",
+  "greenwich",
+  "lewisham",
+  "croydon",
+  "brent",
+  "ealing",
+  "haringey",
+  "waltham forest",
+  "newham",
+  "barking and dagenham",
+  "redbridge",
+  "havering",
+  "bexley",
+  "enfield",
+  "barnet",
+  "harrow",
+  "hillingdon",
+  "hounslow",
+  "richmond upon thames",
+  "kingston upon thames",
+  "merton",
+  "sutton",
+]);
+
+const LONDON_NEIGHBOURHOODS = new Set([
+  "shoreditch",
+  "dalston",
+  "hoxton",
+  "bethnal green",
+  "stratford",
+  "peckham",
+  "brixton",
+  "clapham",
+  "camden town",
+  "soho",
+  "covent garden",
+]);
+
+export function isNycMetroVenue(pin: VenuePin): boolean {
+  if (promotionBoroughForPin(pin)) return true;
+  if (nycCityLabel(pin.city)) return true;
+  if (boroughFromCounty(pin.county)) return true;
+  const state = pin.state?.trim().toLowerCase();
+  return state === "new york" || state === "ny";
+}
+
+export function isLondonMetroVenue(pin: VenuePin): boolean {
+  if (pin.displayCity?.trim() === "London") return true;
+  if (canonicalCityLabel(pin.city) === "london") return true;
+  const borough = canonicalCityLabel(pin.borough ?? pin.city_district ?? "");
+  if (LONDON_BOROUGHS.has(borough)) return true;
+  const suburb = canonicalCityLabel(pin.suburb ?? pin.homeNeighborhood ?? "");
+  if (LONDON_NEIGHBOURHOODS.has(suburb)) return true;
+  return false;
+}
+
+function isNycMetroOriginPart(part: string): boolean {
+  const c = canonicalCityLabel(part);
+  if (nycCityLabel(part)) return true;
+  if (NYC_BOROUGHS.has(c)) return true;
+  if (c.includes("new york")) return true;
+  return false;
+}
+
+function isLondonMetroOriginPart(part: string): boolean {
+  const c = canonicalCityLabel(part);
+  if (c === "london") return true;
+  if (LONDON_BOROUGHS.has(c)) return true;
+  if (LONDON_NEIGHBOURHOODS.has(c)) return true;
+  return false;
+}
+
+const TORONTO_FORMER_BOROUGHS = new Set([
+  "scarborough",
+  "etobicoke",
+  "north york",
+  "east york",
+  "york",
+]);
+
+function isTorontoMetroVenue(pin: VenuePin): boolean {
+  const label = canonicalCityLabel(pin.displayCity ?? pin.city);
+  return label === "toronto";
+}
+
+function isTorontoBoroughOriginPart(part: string): boolean {
+  return TORONTO_FORMER_BOROUGHS.has(canonicalCityLabel(part));
+}
+
+function originAdminTokens(origin: string): Set<string> {
+  const tokens = new Set<string>();
+  for (const segment of origin.split(/[,/]/)) {
+    const t = canonicalCityLabel(segment);
+    if (t) tokens.add(t);
+  }
+  return tokens;
+}
+
+/** Reject homonym cities when origin names a conflicting region (London ON vs London UK, etc.). */
+export function originConflictsWithVenue(
+  origin: string,
+  pin: VenuePin,
+): boolean {
+  const tokens = originAdminTokens(origin);
+  if (tokens.size === 0) return false;
+
+  const country = (pin.country ?? "").trim().toLowerCase();
+  const state = canonicalCityLabel(pin.state ?? "");
+  const inUk =
+    country.includes("united kingdom") ||
+    country === "uk" ||
+    isLondonMetroVenue(pin);
+  const inCanada =
+    country.includes("canada") ||
+    state === "bc" ||
+    state === "british columbia" ||
+    state === "ontario" ||
+    state === "on" ||
+    state === "qc";
+  const inNy = isNycMetroVenue(pin);
+
+  if (
+    inUk &&
+    (tokens.has("ontario") ||
+      tokens.has("on") ||
+      tokens.has("canada") ||
+      tokens.has("michigan") ||
+      tokens.has("mi"))
+  ) {
+    return true;
+  }
+
+  if (
+    inCanada &&
+    (tokens.has("washington") ||
+      tokens.has("wa") ||
+      tokens.has("michigan") ||
+      tokens.has("mi") ||
+      tokens.has("united states") ||
+      tokens.has("usa"))
+  ) {
+    if (tokens.has("vancouver") || tokens.has("brooklyn")) return true;
+  }
+
+  if (inNy && (tokens.has("michigan") || tokens.has("mi"))) {
+    if (tokens.has("brooklyn")) return true;
+  }
+
+  if (isTorontoMetroVenue(pin)) {
+    for (const t of tokens) {
+      if (
+        t.includes("yorkshire") ||
+        t === "england" ||
+        t === "united kingdom" ||
+        t === "uk"
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/** True when origin string has at least one locality beyond country/region. */
+export function originHasSpecificLocality(origin: string): boolean {
+  return originLocalityParts(origin).length > 0;
+}
+
 function isOriginAdminOrCountryPart(part: string): boolean {
   const trimmed = part.trim();
   if (!trimmed) return true;
@@ -419,6 +609,7 @@ export function artistOriginMatchesVenue(
   pin: VenuePin,
 ): boolean {
   if (!origin?.trim()) return false;
+  if (originConflictsWithVenue(origin, pin)) return false;
   const parts = originLocalityParts(origin);
   if (parts.length === 0) return false;
 
@@ -427,6 +618,11 @@ export function artistOriginMatchesVenue(
   for (const part of parts) {
     if (cityLabelsEquivalent(part, pin.city)) return true;
     if (exactVenueLocalityMatch(part, pin)) return true;
+    if (isTorontoMetroVenue(pin) && isTorontoBoroughOriginPart(part)) {
+      return true;
+    }
+    if (isNycMetroVenue(pin) && isNycMetroOriginPart(part)) return true;
+    if (isLondonMetroVenue(pin) && isLondonMetroOriginPart(part)) return true;
     if (nycCityLabel(part) && nycCityLabel(pin.city) && !borough) return true;
     const partBorough = normalizeBorough(part, pin.city);
     if (borough && partBorough === borough) return true;

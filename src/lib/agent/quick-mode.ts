@@ -19,7 +19,6 @@ import {
   headlinerFitLine,
   openerLocalLine,
 } from "./pitch-catalog";
-
 export function lineupToPitch(
   input: LineupRequest,
   lineup: Awaited<ReturnType<typeof buildLineup>>,
@@ -66,6 +65,9 @@ export function lineupToPitch(
       })),
       priorSession?.pin,
     ),
+    openerSwapQueue: lineup.openerSwapQueue,
+    crowdDemographics: lineup.crowdDemographics ?? null,
+    meta: lineup.pitchMeta,
     evidenceFootnotes: {
       mode: "Quick mode: standard lineup, no AI scout.",
     },
@@ -102,18 +104,6 @@ export async function runQuickMode(
   const reused = priorSession?.headlinerEntity
     ? pitchFromAgentSession(input, priorSession)
     : null;
-  writer.writeStep({
-    id: stepId,
-    kind: "quick",
-    status: "running",
-    label: reused
-      ? "Wrapping up from the scout's cached picks (Quick mode)."
-      : "Running the standard lineup (Quick mode).",
-    why: reused
-      ? "Reusing headliner, opener, and promo areas from the agent pass."
-      : "Standard lineup pipeline, no AI scout.",
-  });
-
   let pitch: PitchPayload;
   let qlooDelta = 0;
 
@@ -199,8 +189,12 @@ export async function runQuickMode(
     id: stepId,
     kind: "quick",
     status: "done",
-    label: reused ? "Quick wrap-up ready." : "Quick mode lineup ready.",
-    why: reused ? "Cached scout evidence." : "Standard lineup ready.",
+    label: reused
+      ? "Wrapped up from the scout's cached picks (Quick mode)."
+      : "Standard lineup ready (Quick mode).",
+    why: reused
+      ? "Reused headliner, opener, and promo areas from the agent pass."
+      : "Standard lineup pipeline, no AI scout.",
   });
   writer.writeSummary({
     elapsedSec: Math.max(1, Math.round((Date.now() - startedAt) / 1000)),

@@ -93,7 +93,7 @@
   "query": {
     "localities": {
       "filter": {
-        "entity_id": "81E61924-6CEE-4AB4-93D3-282A5C784AB8",
+        "entity_id": "fixture-locality-new-york-001",
         "name": "New York",
         "subtype": "urn:entity:locality",
         "location": {

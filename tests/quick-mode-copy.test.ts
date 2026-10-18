@@ -20,7 +20,7 @@ describe("full Quick mode copy", () => {
     expect(pitch.moodLine).toBe("An indie folk night sized for your room.");
     expect(pitch.headlinerWhy).toContain("Fixture Alpha is the right size for this room");
     expect(pitch.openerWhy).toBe(
-      "Fixture Beta is a local act in the same lane, an easy warm-up for Fixture Alpha.",
+      "Fixture Beta fits the room's opener slot in the same lane as Fixture Alpha.",
     );
   });
 });

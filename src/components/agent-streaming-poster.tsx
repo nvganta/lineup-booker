@@ -45,7 +45,6 @@ export function AgentStreamingPoster({
           moodLine: "Building your one-night poster…",
           headlinerWhy: "",
           openerWhy: "",
-          crowdLine: "",
           headliner: {
             id: headliner.id,
             name: headliner.name,

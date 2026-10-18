@@ -1,4 +1,5 @@
 import { readableTagLabels } from "@/lib/agent/step-copy";
+import { openerPickLineForSession } from "@/lib/lineup/opener-pick-copy";
 import type { AgentSessionState } from "./types";
 
 export type PitchWhyCatalog = {
@@ -14,10 +15,12 @@ export function regularsStylesPhrase(session: AgentSessionState): string | null 
   const picked: string[] = [];
   for (const raw of readableTagLabels(session.tagLabels ?? [])) {
     const tag = raw
+      .trim()
       .replace(/\bsinger songwriters?\b/, "singer-songwriter")
       .replace(/\bpost punk\b/, "post-punk")
       .replace(/\bhip hop\b/, "hip-hop")
-      .replace(/\bindie(?=[a-z])/g, "indie ");
+      .replace(/\bindie(?=[a-z])/g, "indie ")
+      .trim();
     const words = tag.split(" ").filter((w) => w !== "and" && w !== "&");
     const covered = picked.some((p) => {
       const have = p.split(" ");
@@ -46,12 +49,7 @@ export function headlinerFitLine(session: AgentSessionState): string {
 
 /** Opener line when no slot was chosen (salvage / Quick mode). */
 export function openerLocalLine(session: AgentSessionState): string | null {
-  const opener = session.openerEntity;
-  if (!opener) return null;
-  const headliner = session.headlinerEntity?.name;
-  return headliner
-    ? `${opener.name} is a local act in the same lane, an easy warm-up for ${headliner}.`
-    : `${opener.name} is a local act in the same lane.`;
+  return openerPickLineForSession(session);
 }
 
 /** Mood line when the model didn't write one. */
@@ -91,7 +89,7 @@ export function buildPitchWhyCatalog(
   const opener = session.openerEntity;
   if (opener) {
     openerWhy.local_support = openerLocalLine(session)!;
-    openerWhy.overlap = `${opener.name} draws a local crowd that already overlaps with ${headliner.name}'s fans.`;
+    openerWhy.overlap = `${opener.name} shares taste overlap with ${headliner.name}'s fans in this room's lane.`;
   }
 
   return {

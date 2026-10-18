@@ -158,9 +158,39 @@ export function cityFromAddress(address: NominatimAddress): string | undefined {
     address.town ??
     address.village ??
     address.hamlet ??
-    address.municipality ??
-    address.suburb
+    address.municipality
   );
+}
+
+function isLondonGeocode(addr: NominatimAddress, displayName: string): boolean {
+  const blob = [
+    addr.city,
+    addr.town,
+    addr.borough,
+    addr.city_district,
+    addr.county,
+    addr.state,
+    displayName,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return (
+    /\blondon\b/.test(blob) ||
+    /\bgreater london\b/.test(blob) ||
+    /\b(shoreditch|hackney|camden|islington|westminster|southwark)\b/.test(blob)
+  );
+}
+
+/** Label for UI and saved lineups (not necessarily the Qloo heatmap query city). */
+export function displayCityLabelFromGeocode(hit: GeocodeResult): string {
+  const addr = hit.address ?? {};
+  if (isLondonGeocode(addr, hit.displayName)) return "London";
+  const fromAddr = cityFromAddress(addr);
+  if (fromAddr && !looksLikeStreetName(fromAddr)) return fromAddr;
+  const town = addr.town ?? addr.municipality ?? addr.borough;
+  if (town && !looksLikeStreetName(town)) return town;
+  return cityFromLocationText(hit.displayName);
 }
 
 export function cityFromLocationText(location: string): string {

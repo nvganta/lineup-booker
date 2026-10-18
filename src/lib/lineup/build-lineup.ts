@@ -1,10 +1,14 @@
+import { attachImageUrl, artistImageFromEntity } from "@/lib/agent/lookup-artist";
 import { hintsFromQlooEntity } from "@/lib/agent/research/qloo-hints";
+import type { PitchPayload } from "@/lib/agent/types";
 import type { QlooEntity } from "@/lib/qloo/types";
 import { selectBenchEntities } from "./bench-select";
+import { fetchHeadlinerDemographics } from "./demographics-qloo";
 import { pickHeadlinerForVenue } from "./headliner-local-pick";
 import {
   openerDiscoveryPopularityMax,
   pickOpener,
+  swapQueueFromCandidates,
 } from "./opener-select";
 import {
   discoverHeadliners,
@@ -34,6 +38,7 @@ export type LineupVenuePin = {
   lat: number;
   lon: number;
   city: string;
+  displayCity?: string;
 };
 
 export type { PromoteNeighborhood };
@@ -49,6 +54,9 @@ export type LineupResult = {
   provenance: {
     requests: ProvenanceRequest[];
   };
+  openerSwapQueue?: PitchPayload["openerSwapQueue"];
+  crowdDemographics?: PitchPayload["crowdDemographics"];
+  pitchMeta?: PitchPayload["meta"];
 };
 
 function artistImageUrl(entity: QlooEntity): string | undefined {
@@ -80,8 +88,26 @@ function venuePinDto(pin: {
   lat: number;
   lon: number;
   city: string;
+  displayCity?: string;
 }): LineupVenuePin {
-  return { lat: pin.lat, lon: pin.lon, city: pin.city };
+  return {
+    lat: pin.lat,
+    lon: pin.lon,
+    city: pin.city,
+    displayCity: pin.displayCity,
+  };
+}
+
+function countryFromLocation(location: string): string {
+  const parts = location
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const last = parts[parts.length - 1] ?? "";
+  if (/canada/i.test(last) || /^(BC|ON|AB)$/i.test(last)) return "Canada";
+  if (/united kingdom|uk|england/i.test(last)) return "United Kingdom";
+  if (/united states|usa/i.test(last)) return "United States";
+  return last || "Canada";
 }
 
 function emptyHeadlinerPlaceholder(): LineupArtist {
@@ -179,13 +205,61 @@ export async function buildLineup(input: LineupRequest): Promise<LineupResult> {
     },
   );
 
-  const [openerPick, neighborhoodResult] = await Promise.all([
+  const [openerPick, neighborhoodResult, demoResult] = await Promise.all([
     openerPromise,
     neighborhoodsPromise,
+    fetchHeadlinerDemographics(
+      headlinerId,
+      signals.cityForHeatmap,
+      requests,
+    ),
   ]);
   const neighborhoods = neighborhoodResult.neighborhoods;
 
   const openerEntity = openerPick.opener;
+  const chosenOpenerId = openerEntity
+    ? entityId(openerEntity)
+    : undefined;
+  const swapRows = swapQueueFromCandidates(
+    openerPick.swapCandidates,
+    chosenOpenerId,
+  ).slice(0, 5);
+  const openerSwapQueue: PitchPayload["openerSwapQueue"] = await Promise.all(
+    swapRows.map(async (row) => {
+      const entity = openerPick.swapCandidates.find(
+        (c) => entityId(c.entity) === row.id,
+      )?.entity;
+      let imageUrl: string | undefined;
+      if (entity) {
+        const enriched = await attachImageUrl(entity, requests);
+        imageUrl = artistImageFromEntity(enriched);
+      }
+      return { ...row, imageUrl, popularity: entity?.popularity };
+    }),
+  );
+  const openerOriginByActId: Record<string, boolean> = {};
+  for (const row of openerPick.audit) {
+    if (row.originMatch === true) openerOriginByActId[row.id] = true;
+  }
+  for (const row of openerSwapQueue) {
+    if (row.reason === "origin matches venue") openerOriginByActId[row.id] = true;
+  }
+  const cityLabel = pin.displayCity?.trim() || pin.city;
+  const openerId = openerEntity ? entityId(openerEntity) : undefined;
+  const pitchMeta: PitchPayload["meta"] = {
+    cityQuery: signals.cityForHeatmap,
+    countryQuery: countryFromLocation(input.location),
+    cityLabel,
+    concept: input.concept,
+    regularsLove: input.regularsLove,
+    musicTagIds: [...signals.musicTagIds],
+    tagLabels: [...signals.tagLabels],
+    openerOriginByActId,
+    openerOriginMatchesCity:
+      openerId != null ? openerOriginByActId[openerId] === true : false,
+    headlinerPopularity: headlinerEntity.popularity,
+    openerPopularity: openerEntity?.popularity,
+  };
   const excludeFromAlternates = [headlinerEntity];
   if (openerEntity) excludeFromAlternates.push(openerEntity);
 
@@ -208,5 +282,8 @@ export async function buildLineup(input: LineupRequest): Promise<LineupResult> {
     alternates,
     neighborhoods,
     provenance: { requests },
+    openerSwapQueue,
+    crowdDemographics: demoResult.demographics,
+    pitchMeta,
   };
 }

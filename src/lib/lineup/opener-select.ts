@@ -1,5 +1,4 @@
-import { qlooGet } from "@/lib/qloo/client";
-import type { QlooEntity, QlooInsightsResponse } from "@/lib/qloo/types";
+import type { QlooEntity } from "@/lib/qloo/types";
 import {
   filterMusicArtists,
   isMusicArtist,
@@ -7,7 +6,12 @@ import {
   isSamePerson,
 } from "./artist-filter";
 import { gatherArtistOriginTexts } from "./artist-origin-sources";
-import { artistOriginMatchesVenue, type VenuePin } from "./geography";
+import {
+  artistOriginMatchesVenue,
+  originHasSpecificLocality,
+  type VenuePin,
+} from "./geography";
+import { isPlausiblePlaceOrigin } from "./origin-place";
 import type { PopularityBand } from "./tiers";
 import type { ProvenanceRequest } from "./translate-venue";
 import { isActorFirstByWikipedia } from "@/lib/agent/research/actor-screen";
@@ -18,6 +22,7 @@ export type OpenerAudit = {
   id: string;
   popularity?: number;
   hasLocalSignal: boolean;
+  originMatch?: boolean;
   kept: boolean;
   reason: string;
 };
@@ -37,26 +42,6 @@ export function openerDiscoveryPopularityMax(
   return Math.min(relative, band.openerMax);
 }
 
-async function hasLocalSignalInCity(
-  artistId: string,
-  city: string,
-  requests: ProvenanceRequest[],
-): Promise<boolean> {
-  const { data, request } = await qlooGet<QlooInsightsResponse>(
-    "/v2/insights",
-    {
-      "filter.type": "urn:entity:artist",
-      "filter.results.entities": artistId,
-      "signal.location.query": city,
-      take: 5,
-    },
-  );
-  requests.push(request);
-  return (data.results?.entities ?? []).some(
-    (e) => (e.entity_id ?? e.id) === artistId,
-  );
-}
-
 export type PickOpenerOptions = {
   requests?: ProvenanceRequest[];
   band?: PopularityBand;
@@ -66,12 +51,15 @@ export type PickOpenerOptions = {
 
 const OPENER_BATCH_SIZE = 2;
 
-async function candidateHasLocalSignal(
+export async function evaluateOpenerLocalEvidence(
   candidate: QlooEntity,
   pin: VenuePin,
-  localQueryCity: string,
-  requests: ProvenanceRequest[],
-): Promise<{ ok: boolean; reason: string }> {
+): Promise<{
+  ok: boolean;
+  reason: string;
+  hasLocalSignal: boolean;
+  originMatch?: boolean;
+}> {
   const hints = hintsFromQlooEntity(candidate);
   const entityId = candidate.entity_id ?? candidate.id;
   const originTexts = await gatherArtistOriginTexts(
@@ -81,24 +69,40 @@ async function candidateHasLocalSignal(
   );
 
   if (originTexts.length > 0) {
-    const mismatches = originTexts.filter(
-      (origin) => !artistOriginMatchesVenue(origin, pin),
+    const placeLike = originTexts.filter(
+      (origin) =>
+        isPlausiblePlaceOrigin(origin) && originHasSpecificLocality(origin),
     );
-    if (mismatches.length > 0) {
+    if (placeLike.length === 0) {
+      return {
+        ok: true,
+        reason: "fits opener pool for this room (no origin on file)",
+        hasLocalSignal: false,
+      };
+    }
+    const matching = placeLike.filter((origin) =>
+      artistOriginMatchesVenue(origin, pin),
+    );
+    if (matching.length === 0) {
       return {
         ok: false,
         reason: "origin outside venue city or borough",
+        hasLocalSignal: false,
       };
     }
-    return { ok: true, reason: "origin matches venue" };
+    return {
+      ok: true,
+      reason: "origin matches venue",
+      hasLocalSignal: true,
+      originMatch: true,
+    };
   }
 
-  const id = entityId ?? candidate.name;
-  const qlooLocal = await hasLocalSignalInCity(id, localQueryCity, requests);
-  if (qlooLocal) {
-    return { ok: true, reason: "local signal in city (no origin data)" };
-  }
-  return { ok: false, reason: "no local signal in city" };
+  return {
+    ok: true,
+    reason: "fits opener pool for this room (no origin on file)",
+    hasLocalSignal: false,
+  };
 }
 
 export async function pickOpener(
@@ -108,21 +112,20 @@ export async function pickOpener(
   pin: VenuePin,
   genreTagIds: string[],
   options: PickOpenerOptions = {},
-): Promise<{ opener: QlooEntity | null; audit: OpenerAudit[] }> {
-  const requests = options.requests ?? [];
+): Promise<{
+  opener: QlooEntity | null;
+  audit: OpenerAudit[];
+  swapCandidates: Array<{ entity: QlooEntity; reason: string }>;
+}> {
   const band = options.band;
-  const localQueryCity = options.localQueryCity ?? pin.city;
-  const headlinerPop = headliner.popularity ?? 1;
-  const popCap = openerDiscoveryPopularityMax(headlinerPop, band);
   const audit: OpenerAudit[] = [];
+  const swapCandidates: Array<{ entity: QlooEntity; reason: string }> = [];
   const filtered = filterMusicArtists(candidates, genreTagIds, [headliner]);
 
   for (let i = 0; i < filtered.length; i += OPENER_BATCH_SIZE) {
     const batch = filtered.slice(i, i + OPENER_BATCH_SIZE);
     const localResults = await Promise.all(
-      batch.map((candidate) =>
-        candidateHasLocalSignal(candidate, pin, localQueryCity, requests),
-      ),
+      batch.map((candidate) => evaluateOpenerLocalEvidence(candidate, pin)),
     );
 
     for (let j = 0; j < batch.length; j++) {
@@ -147,6 +150,9 @@ export async function pickOpener(
         continue;
       }
 
+      const headlinerPop = headliner.popularity ?? 1;
+      const popCap = openerDiscoveryPopularityMax(headlinerPop, band);
+
       if ((candidate.popularity ?? 0) >= headlinerPop - 0.02) {
         audit.push({ ...base, reason: "not less popular than headliner" });
         continue;
@@ -167,7 +173,7 @@ export async function pickOpener(
       if (!local?.ok) {
         audit.push({
           ...base,
-          reason: local?.reason ?? "not based in venue city or borough",
+          reason: local.reason,
         });
         continue;
       }
@@ -182,15 +188,63 @@ export async function pickOpener(
         continue;
       }
 
+      const pickReason = local.reason;
+      const alreadyHaveOpener = swapCandidates.length > 0;
       audit.push({
         ...base,
-        hasLocalSignal: true,
-        kept: true,
-        reason: "selected",
+        hasLocalSignal: local.hasLocalSignal,
+        originMatch: local.originMatch,
+        kept: !alreadyHaveOpener,
+        reason: alreadyHaveOpener
+          ? "runner-up for opener slot"
+          : "selected",
       });
-      return { opener: candidate, audit };
+      swapCandidates.push({ entity: candidate, reason: pickReason });
     }
   }
 
-  return { opener: null, audit };
+  return {
+    opener: swapCandidates[0]?.entity ?? null,
+    audit,
+    swapCandidates,
+  };
+}
+
+export function swapQueueFromCandidates(
+  swapCandidates: Array<{ entity: QlooEntity; reason: string }>,
+  skipId?: string,
+): Array<{ id: string; name: string; reason: string }> {
+  return swapCandidates
+    .filter((c) => {
+      const id = c.entity.entity_id ?? c.entity.id ?? c.entity.name;
+      return id !== skipId;
+    })
+    .map((c) => ({
+      id: c.entity.entity_id ?? c.entity.id ?? c.entity.name,
+      name: c.entity.name,
+      reason: c.reason,
+    }));
+}
+
+export function humanOpenerRejectReason(reason: string): string {
+  switch (reason) {
+    case "origin outside venue city or borough":
+      return "origin outside this city";
+    case "origin not specific enough":
+      return "origin wasn't city-specific";
+    case "above room opener popularity cap":
+      return "too famous for this room";
+    case "actor-first profile (public bio)":
+      return "actor-first public profile";
+    case "not less popular than headliner":
+      return "not below headliner popularity";
+    case "not a music artist for this genre":
+      return "not a match for the room's genres";
+    case "same act as headliner":
+      return "same act as headliner";
+    case "runner-up for opener slot":
+      return "next in line after the picked opener";
+    default:
+      return reason.replace(/_/g, " ");
+  }
 }
