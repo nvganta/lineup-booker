@@ -103,21 +103,28 @@ function FitBounds({
 }) {
   const map = useMap();
   useEffect(() => {
+    // Fit to where the markers are actually drawn (pins next to the venue
+    // get nudged), plus the venue itself, so no pin sits on the edge.
+    const [vLat, vLon] = venueMarkerLatLng(venue, neighborhoods);
     const pinPoints: L.LatLngExpression[] = neighborhoods
       .filter((n) => n.lat != null && n.lon != null)
-      .map((n) => [n.lat!, n.lon!] as L.LatLngExpression);
+      .map((n) =>
+        neighborhoodPinLatLng(vLat, vLon, {
+          rank: n.rank,
+          lat: n.lat!,
+          lon: n.lon!,
+        }),
+      );
     if (pinPoints.length >= 2) {
-      // The card map is a short strip, so keep vertical padding just
-      // larger than half a pin and let zoom snap in quarter steps.
+      // The card map is a short strip: keep padding just over half a pin
+      // (26px) and let zoom snap in quarter steps.
       map.invalidateSize();
-      map.fitBounds(L.latLngBounds(pinPoints), {
-        paddingTopLeft: [24, 16],
-        paddingBottomRight: [24, 16],
+      map.fitBounds(L.latLngBounds([...pinPoints, [vLat, vLon]]), {
+        padding: [24, 18],
         maxZoom: 15,
       });
       return;
     }
-    const [vLat, vLon] = venueMarkerLatLng(venue, neighborhoods);
     map.setView([vLat, vLon], 14);
   }, [map, venue, neighborhoods]);
   return null;
