@@ -1,6 +1,6 @@
 import type { LineupRequest } from "@/lib/lineup/schemas";
 import type { AgentSessionState, PitchPayload } from "./types";
-import { venueDisplayName } from "@/lib/lineup/venue-display";
+import { typedVenueLabel } from "@/lib/lineup/venue-display";
 import { withoutOpener } from "./runtime";
 import { applyArtistBackgroundsToPitch } from "./research/apply-pitch";
 import {
@@ -37,7 +37,7 @@ export function pitchFromAgentSession(
   const backgrounds = session.artistBackgrounds ?? {};
   const neighborhoods = promoNeighborhoodsWithHomeFirst(session);
   let pitch: PitchPayload = {
-    venueLabel: venueDisplayName(input.concept),
+    venueLabel: typedVenueLabel(input.concept),
     address: input.location,
     moodLine: fallbackMoodLine(session),
     headlinerWhy: headlinerFitLine(session),

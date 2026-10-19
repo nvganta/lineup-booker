@@ -14,3 +14,13 @@ export function venueDisplayName(concept: string): string {
   }
   return text || "Your venue";
 }
+
+/**
+ * Venue title as the owner typed it (capacity included), falling back to the
+ * short display name when the paste is too long for the poster header.
+ */
+export function typedVenueLabel(concept: string | undefined | null): string {
+  const typed = concept?.trim() ?? "";
+  if (typed && typed.length <= 80) return typed;
+  return venueDisplayName(typed);
+}

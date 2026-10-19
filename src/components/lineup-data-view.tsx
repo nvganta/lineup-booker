@@ -4,26 +4,19 @@ import { readableTagLabels } from "@/lib/agent/step-copy";
 import { CrowdSkewBars } from "@/components/crowd-skew-bars";
 import type { PitchAnalytics } from "@/lib/lineup/pitch-analytics";
 import type { PitchPayload } from "@/lib/agent/types";
-import dynamic from "next/dynamic";
 import {
   Bar,
   BarChart,
   CartesianGrid,
+  ResponsiveContainer,
   XAxis,
   YAxis,
 } from "recharts";
 import { cn } from "@/lib/utils";
 
-const LineupMap = dynamic(
-  () => import("@/components/lineup-map").then((m) => m.LineupMap),
-  { ssr: false, loading: () => null },
-);
-
 type Props = {
   pitch: PitchPayload;
   analytics: PitchAnalytics | null;
-  venue?: { lat: number; lon: number };
-  wideFeed?: boolean;
   className?: string;
 };
 
@@ -36,8 +29,6 @@ function na(label = "not available") {
 export function LineupDataView({
   pitch,
   analytics,
-  venue,
-  wideFeed,
   className,
 }: Props) {
   const actRows =
@@ -66,12 +57,17 @@ export function LineupDataView({
     <div className={cn("px-5 py-5 space-y-6 text-sm", className)}>
       <section className="space-y-3">
         <p className="text-[10px] uppercase tracking-[0.22em] text-[#6b5c52]">
-          Local vs national affinity
+          Local vs national
+        </p>
+        <p className="flex gap-3 text-[11px] text-[#6b5c52]">
+          <span className="inline-flex items-center gap-1.5"><span className="inline-block h-[6px] w-2.5 bg-[#8c4a32]" />Local</span>
+          <span className="inline-flex items-center gap-1.5"><span className="inline-block h-[6px] w-2.5 bg-[#c4b5a8]" />National</span>
         </p>
         {barData.length > 0 &&
         barData.some((d) => d.local != null || d.national != null) ? (
-          <div className="h-[180px] w-full">
-            <BarChart width={480} height={180} data={barData}>
+          <div className="h-[180px] w-full max-w-[480px]">
+            <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={barData}>
               <CartesianGrid stroke="#e8dfd6" vertical={false} />
               <XAxis
                 dataKey="name"
@@ -91,6 +87,7 @@ export function LineupDataView({
                 radius={2}
               />
             </BarChart>
+            </ResponsiveContainer>
           </div>
         ) : (
           na()
@@ -99,13 +96,13 @@ export function LineupDataView({
 
       <section className="space-y-2">
         <p className="text-[10px] uppercase tracking-[0.22em] text-[#6b5c52]">
-          Opener ↔ headliner overlap
+          Opener overlap
         </p>
         {overlapVal != null ? (
           <div className="flex items-center gap-6">
             <OverlapCircles value={overlapVal} />
             <p className="text-xs text-[#5c534d] max-w-[14rem] leading-snug">
-              {overlap?.label}
+              {overlap?.label?.replace(/,\s*\d(?:\.\d+)?\s*$/, "")}
             </p>
           </div>
         ) : (
@@ -113,35 +110,10 @@ export function LineupDataView({
         )}
       </section>
 
-      <section className="space-y-2">
-        <p className="text-[10px] uppercase tracking-[0.22em] text-[#6b5c52]">
-          Neighbourhood rank
-        </p>
-        {pitch.neighborhoods.length > 0 ? (
-          <ol className="list-none space-y-1">
-            {pitch.neighborhoods.map((n) => (
-              <li key={n.rank} className="flex gap-2">
-                <span className="text-[#8c4a32] font-medium">
-                  #{n.rank}
-                </span>
-                <span className="font-heading">{n.name}</span>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          na()
-        )}
-        {venue && pitch.neighborhoods.length > 0 && (
-          <LineupMap
-            lineup={{ venue: { ...venue, city: "Venue" }, neighborhoods: pitch.neighborhoods }}
-            className={wideFeed ? "h-[200px]" : "h-[160px]"}
-          />
-        )}
-      </section>
 
       <section className="space-y-2">
         <p className="text-[10px] uppercase tracking-[0.22em] text-[#6b5c52]">
-          Venue taste tags
+          Venue tags
         </p>
         {analytics?.venueTags && analytics.venueTags.length > 0 ? (
           <ul className="flex flex-wrap gap-2 list-none">
@@ -151,7 +123,6 @@ export function LineupDataView({
                 className="rounded-full border border-[#e0d5ca] px-2.5 py-0.5 text-xs text-[#1a1614] bg-[#fcf9f5]"
               >
                 {readableTagLabels([t.name])[0] ?? t.name}
-                <span className="text-[#8a7f76] ml-1">({t.source})</span>
               </li>
             ))}
           </ul>
@@ -164,7 +135,7 @@ export function LineupDataView({
         (analytics.demographics.age || analytics.demographics.gender) && (
           <section className="space-y-2">
             <p className="text-[10px] uppercase tracking-[0.22em] text-[#6b5c52]">
-              Crowd skew (Qloo demographics)
+              Crowd
             </p>
             <CrowdSkewBars demographics={analytics.demographics} />
           </section>

@@ -8,7 +8,7 @@ import {
 import { RESEARCH_TOTAL_MS } from "./research/types";
 import { withoutOpener } from "./runtime";
 import { validatePitchPayload } from "./pitch-validator";
-import { venueDisplayName } from "@/lib/lineup/venue-display";
+import { typedVenueLabel } from "@/lib/lineup/venue-display";
 import { promoListIncludesHome } from "@/lib/lineup/venue-home-area";
 import { promoNeighborhoodsWithHomeFirst } from "./quick-from-session";
 import {
@@ -33,7 +33,7 @@ export function salvagePitch(
   }
 
   const pitch: PitchPayload = {
-    venueLabel: venueDisplayName(input.concept),
+    venueLabel: typedVenueLabel(input.concept),
     address: input.location,
     moodLine: fallbackMoodLine(session),
     headlinerWhy: headlinerFitLine(session),

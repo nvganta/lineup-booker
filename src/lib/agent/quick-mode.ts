@@ -2,7 +2,7 @@ import { buildLineup } from "@/lib/lineup/build-lineup";
 import type { LineupRequest } from "@/lib/lineup/schemas";
 import type { AgentSessionState, PitchPayload } from "./types";
 import type { StreamWriter } from "./types";
-import { venueDisplayName } from "@/lib/lineup/venue-display";
+import { typedVenueLabel } from "@/lib/lineup/venue-display";
 import { enrichPitchWithArtistResearch } from "./research/quick-research";
 import type { ArtistResearchInput } from "./research/types";
 import {
@@ -32,7 +32,9 @@ export function lineupToPitch(
     tagLabels: priorSession?.tagLabels ?? [],
   } as unknown as AgentSessionState;
   return {
-    venueLabel: lineup.venueLabel || venueDisplayName(input.concept),
+    venueLabel: input.concept?.trim()
+      ? typedVenueLabel(input.concept)
+      : lineup.venueLabel || typedVenueLabel(input.concept),
     address: input.location,
     moodLine: fallbackMoodLine(copySession),
     headlinerWhy: headlinerFitLine(copySession),

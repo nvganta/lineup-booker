@@ -17,5 +17,5 @@ export function ordinal(n: number): string {
 
 export function popularityPercentileLine(percentile: number): string {
   const pct = Math.round(percentile * 100);
-  return `About ${ordinal(pct)} percentile globally for listener reach.`;
+  return `${ordinal(pct)} percentile for listener reach`;
 }

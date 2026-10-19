@@ -1,7 +1,8 @@
 import type { LineupRequest } from "@/lib/lineup/schemas";
 import type { LineupResult } from "@/lib/lineup/build-lineup";
 import type { AgentStreamState } from "./consume-agent-stream";
-import type { PitchPayload } from "./types";
+import type { MapDataPart, PitchPayload } from "./types";
+import { typedVenueLabel } from "@/lib/lineup/venue-display";
 
 export function agentStreamHasTerminalEvent(state: AgentStreamState): boolean {
   return Boolean(state.pitch) || Boolean(state.summary);
@@ -11,8 +12,10 @@ function pitchFromLineupResult(
   input: LineupRequest,
   lineup: LineupResult,
 ): PitchPayload {
+  const cityLabel =
+    lineup.venue?.displayCity?.trim() || lineup.venue?.city?.trim() || "";
   return {
-    venueLabel: lineup.venueLabel,
+    venueLabel: typedVenueLabel(input.concept) || lineup.venueLabel,
     address: input.location,
     moodLine: "A live night sized for your room.",
     headlinerWhy: `${lineup.headliner.name} is the right size for this room and in the lane your regulars love.`,
@@ -45,6 +48,27 @@ function pitchFromLineupResult(
     evidenceFootnotes: {
       mode: "Quick mode after an interrupted scout.",
     },
+    meta:
+      lineup.pitchMeta ??
+      (cityLabel
+        ? {
+            cityQuery: cityLabel,
+            cityLabel,
+            concept: input.concept,
+            regularsLove: input.regularsLove,
+            musicTagIds: [],
+          }
+        : undefined),
+  };
+}
+
+function mapFromLineupResult(lineup: LineupResult): MapDataPart | undefined {
+  if (!lineup.venue) return undefined;
+  return {
+    venue: { lat: lineup.venue.lat, lon: lineup.venue.lon },
+    pins: lineup.neighborhoods
+      .filter((n) => n.lat != null && n.lon != null)
+      .map((n) => ({ rank: n.rank, name: n.name, lat: n.lat!, lon: n.lon! })),
   };
 }
 
@@ -85,7 +109,7 @@ export function salvagePitchFromStreamState(
 
 export async function fetchQuickLineupPitch(
   input: LineupRequest,
-): Promise<PitchPayload | null> {
+): Promise<{ pitch: PitchPayload; map?: MapDataPart } | null> {
   const res = await fetch("/api/lineup", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -94,7 +118,10 @@ export async function fetchQuickLineupPitch(
   if (!res.ok) return null;
   const json = (await res.json()) as { lineup?: LineupResult };
   if (!json.lineup) return null;
-  return pitchFromLineupResult(input, json.lineup);
+  return {
+    pitch: pitchFromLineupResult(input, json.lineup),
+    map: mapFromLineupResult(json.lineup),
+  };
 }
 
 export async function recoverIncompleteAgentStream(
@@ -121,9 +148,10 @@ export async function recoverIncompleteAgentStream(
     return state;
   }
 
-  const quickPitch = await fetchQuickLineupPitch(input);
-  if (quickPitch) {
-    state.pitch = quickPitch;
+  const quick = await fetchQuickLineupPitch(input);
+  if (quick) {
+    state.pitch = quick.pitch;
+    if (quick.map && !state.map) state.map = quick.map;
     state.summary = {
       elapsedSec: 0,
       qlooLookups: 0,

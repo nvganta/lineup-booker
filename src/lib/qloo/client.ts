@@ -30,7 +30,7 @@ export type QlooRequestMeta = {
 export async function qlooGet<T>(
   path: string,
   params: QlooQueryParams,
-): Promise<{ data: T; request: QlooRequestMeta }> {
+): Promise<{ data: T; request: QlooRequestMeta; cached?: boolean }> {
   const { apiKey, baseUrl } = getQlooConfig();
   if (!apiKey) {
     throw new QlooConfigError(
@@ -46,6 +46,7 @@ export async function qlooGet<T>(
     return {
       data: cached,
       request: { method: "GET", path, query },
+      cached: true,
     };
   }
 
