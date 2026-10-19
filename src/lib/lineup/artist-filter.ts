@@ -106,10 +106,39 @@ export function isPrimarilyActorProfile(entity: QlooEntity): boolean {
   return actors.length >= musicTags.length;
 }
 
+function tagKinds(entity: QlooEntity): string[] {
+  return (entity.tags ?? [])
+    .map((t) => (t.id || t.type || "").toLowerCase())
+    .filter(Boolean);
+}
+
+const HOST_ROLE =
+  /\b(television|tv|radio|broadcaster|host|presenter|journalist|personality|podcaster|interviewer|commentator|comedian|actor|actress)\b/i;
+const PERFORMER_ROLE =
+  /\b(singer|songwriter|band|musician|rapper|dj|producer|composer|guitarist|vocalist|pianist|drummer|bassist|duo|trio|group|ensemble|orchestra|artist|performer|mc)\b/i;
+
+/**
+ * Qloo files some broadcasters and hosts as artists with a stray genre tag.
+ * Two signals catch them without naming anyone:
+ * - Qloo describes how real acts sound (urn:tag:music:qloo) or what they
+ *   play (urn:tag:instrument:qloo). A profile that has Qloo style or
+ *   character tags but none of those describes a person, not an act.
+ * - The short description names a broadcast or screen role and no music role.
+ */
+export function isNonPerformerProfile(entity: QlooEntity): boolean {
+  const desc = entity.properties?.short_description ?? "";
+  if (desc && HOST_ROLE.test(desc) && !PERFORMER_ROLE.test(desc)) return true;
+  const kinds = tagKinds(entity);
+  const described = kinds.some((k) => k.includes(":style:qloo") || k.includes(":characteristic:qloo"));
+  const sounds = kinds.some((k) => k.includes(":music:qloo") || k.includes(":instrument:qloo"));
+  return described && !sounds && !hasMusicCareerEvidence(entity);
+}
+
 function passesMusicCareerGate(entity: QlooEntity): boolean {
   const ids = entityTagIds(entity);
   const musicTags = musicGenreTagIds(ids);
   if (musicTags.length === 0) return false;
+  if (isNonPerformerProfile(entity)) return false;
 
   if (isPrimarilyActorProfile(entity)) return false;
 
