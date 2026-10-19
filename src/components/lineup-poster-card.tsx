@@ -33,6 +33,8 @@ import {
 } from "@/lib/lineup/act-why-cache";
 import { applyOpenerSwap } from "@/lib/lineup/opener-swap-state";
 import { stripCityFromNeighborhoodLabel } from "@/lib/lineup/neighborhood-display";
+import { CompareSwitch, WithoutQlooView } from "@/components/without-qloo-view";
+import { BookItView } from "@/components/book-it-view";
 import { cn } from "@/lib/utils";
 
 const LineupMap = dynamic(
@@ -77,6 +79,8 @@ export function LineupPosterCard({
   const [analyticsRev, setAnalyticsRev] = useState(0);
   const [tab, setTab] = useState<ResultTab>("lineup");
   const [venueTabsOpened, setVenueTabsOpened] = useState(false);
+  const [compare, setCompare] = useState(false);
+  const [booking, setBooking] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const analyticsInput = analyticsInputFromPitch(pitch);
   const analyticsState = usePitchAnalytics(analyticsInput, analyticsRev);
@@ -213,6 +217,33 @@ export function LineupPosterCard({
     return chips;
   }, [styleTags, crowdLine, pitch.opener, pitch.headliner, localActIds, venueCity, insightsState]);
 
+  const plainForm = useMemo(
+    () => ({
+      concept: pitch.meta?.concept?.trim() || pitch.venueLabel,
+      address: pitch.address,
+      regulars: pitch.meta?.regularsLove?.trim() || "",
+    }),
+    [pitch.meta?.concept, pitch.meta?.regularsLove, pitch.venueLabel, pitch.address],
+  );
+  const bookingInput = useMemo(
+    () => ({
+      headliner: pitch.headliner.name,
+      opener: pitch.opener?.name ?? null,
+      venueLabel: pitch.venueLabel,
+      address: pitch.address,
+      cityLabel: insightsInput?.cityLabel ?? venueCity ?? "",
+      neighborhoods: insightsInput?.neighborhoods ?? [],
+      styleTags,
+      rows: [],
+    }),
+    [pitch.headliner.name, pitch.opener?.name, pitch.venueLabel, pitch.address, insightsInput, venueCity, styleTags],
+  );
+  const handleBook = useCallback(() => {
+    setBooking(true);
+    setCompare(false);
+    setVenueTabsOpened(true);
+  }, []);
+
   const handleTab = useCallback((t: ResultTab) => {
     setTab(t);
     if (t === "food" || t === "marketing") setVenueTabsOpened(true);
@@ -252,6 +283,11 @@ export function LineupPosterCard({
   return (
     <div className={cn("space-y-3", className)}>
       <ResultTabs value={tab} onChange={handleTab} />
+      {tab === "lineup" && !booking && (
+        <div className="flex justify-end -mt-1">
+          <CompareSwitch on={compare} onChange={setCompare} />
+        </div>
+      )}
 
       <motion.div
         initial={animateSettle ? { opacity: 0, y: 10 } : false}
@@ -260,7 +296,7 @@ export function LineupPosterCard({
       >
         <div
           ref={cardRef}
-          className={cn("space-y-3", tab !== "lineup" && "hidden")}
+          className={cn("space-y-3", (tab !== "lineup" || compare || booking) && "hidden")}
           data-tab-panel="lineup"
         >
           <article className={articleClass}>
@@ -390,9 +426,36 @@ export function LineupPosterCard({
               >
                 Download poster
               </Button>
+              <Button
+                type="button"
+                className="rounded-full bg-[#8c4a32] hover:bg-[#7a3f2a] text-white text-sm"
+                onClick={handleBook}
+                data-book-it
+              >
+                Book it
+              </Button>
             </div>
           </article>
         </div>
+
+        {tab === "lineup" && compare && !booking && (
+          <WithoutQlooView
+            pitch={pitch}
+            venueCity={venueCity}
+            form={plainForm}
+            headlinerLine={headlinerWhyLine}
+            openerLine={openerReachLine}
+          />
+        )}
+
+        {tab === "lineup" && booking && (
+          <BookItView
+            input={bookingInput}
+            insights={insightsState}
+            fileSlug={slugifyFilename(pitch.venueLabel)}
+            onBack={() => setBooking(false)}
+          />
+        )}
 
         {tab === "food" && (
           <FoodDealsView

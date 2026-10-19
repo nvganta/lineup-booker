@@ -8,8 +8,7 @@ import {
 import type { LineupRequest } from "@/lib/lineup/schemas";
 import { lineupRequestSchema } from "@/lib/lineup/schemas";
 import {
-  agentFallbackModelIds,
-  agentModelId,
+  agentModelChain,
   AGENT_TEMPERATURE,
 } from "./model";
 import { AgentBudget, AgentBudgetError } from "./budget";
@@ -207,10 +206,7 @@ async function runLlmAgent(
   runtime: AgentRuntime,
   mergeStream: (stream: ReadableStream<unknown>) => void,
 ): Promise<void> {
-  const modelIds = [
-    agentModelId(),
-    ...agentFallbackModelIds().filter((m) => m !== agentModelId()),
-  ];
+  const modelIds = await agentModelChain();
   let lastError: unknown;
   for (let i = 0; i < modelIds.length; i++) {
     const modelId = modelIds[i]!;

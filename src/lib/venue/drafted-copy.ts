@@ -1,6 +1,6 @@
 import { createGatewayProvider } from "@ai-sdk/gateway";
 import { generateText } from "ai";
-import { agentFallbackModelIds, agentModelId } from "@/lib/agent/model";
+import { agentModelChain } from "@/lib/agent/model";
 import { getPersistentStore } from "@/lib/cache/persistent-store";
 import type { TasteCountRow } from "./place-insights";
 
@@ -333,10 +333,7 @@ export async function draftVenueCopy(
   const hit = await store.get<DraftedCopy>(key);
   if (hit) return hit;
 
-  const modelIds = [
-    agentModelId(),
-    ...agentFallbackModelIds().filter((m) => m !== agentModelId()),
-  ].slice(0, 2);
+  const modelIds = (await agentModelChain()).slice(0, 2);
   const gateway = createGatewayProvider({ apiKey: process.env.AI_GATEWAY_API_KEY });
   const prompt = promptFor(input, ideaCount);
   for (const [i, modelId] of modelIds.entries()) {
