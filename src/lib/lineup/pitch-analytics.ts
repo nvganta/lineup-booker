@@ -511,6 +511,8 @@ export type PitchAnalyticsInput = {
   headlinerPopularity?: number;
   openerPopularity?: number;
   tagLabels?: string[];
+  /** The scout already fetched these; passing them back saves a Qloo call. */
+  crowdDemographics?: CrowdDemographics | null;
 };
 
 export async function buildPitchAnalytics(
@@ -558,11 +560,13 @@ export async function buildPitchAnalytics(
             method: "unavailable" as const,
           }),
       fetchVenueTasteTags(input.concept, input.regularsLove, requests),
-      fetchHeadlinerDemographics(
-        input.headliner.id,
-        input.cityQuery,
-        requests,
-      ),
+      input.crowdDemographics
+        ? Promise.resolve({ demographics: input.crowdDemographics })
+        : fetchHeadlinerDemographics(
+            input.headliner.id,
+            input.cityQuery,
+            requests,
+          ),
     ]);
 
   const localMap = localBatch.affinity;

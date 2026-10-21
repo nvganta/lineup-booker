@@ -27,6 +27,15 @@ const bodySchema = z.object({
   headlinerPopularity: z.number().optional(),
   openerPopularity: z.number().optional(),
   tagLabels: z.array(z.string()).optional(),
+  crowdDemographics: z
+    .object({
+      age: z.record(z.string(), z.number()).nullable(),
+      gender: z
+        .object({ male: z.number().optional(), female: z.number().optional() })
+        .nullable(),
+    })
+    .nullable()
+    .optional(),
 });
 
 export async function POST(req: Request) {

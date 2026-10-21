@@ -15,6 +15,11 @@ export function tagWords(urn: string): string {
   return last.replace(/_/g, " ");
 }
 
+/** "0.8014590312" → "0.8"; exact values stay in the request line. */
+export function shortNumber(v: string): string {
+  return /^-?\d+\.\d{3,}$/.test(v) ? String(Number(Number(v).toFixed(2))) : v;
+}
+
 function list(raw: string | undefined, names: Map<string, string>): string {
   return (raw ?? "")
     .split(",")
@@ -47,7 +52,7 @@ function insightsTitle(p: Record<string, string>, names: Map<string, string>): s
     if (seed) return `Found acts ${seed}'s fans also love${tags ? `, within ${tags}` : ""}`;
     const band =
       p["filter.popularity.min"] || p["filter.popularity.max"]
-        ? `, sized for the room (popularity ${p["filter.popularity.min"] ?? "0"}–${p["filter.popularity.max"] ?? "1"})`
+        ? `, sized for the room (popularity ${shortNumber(p["filter.popularity.min"] ?? "0")}–${shortNumber(p["filter.popularity.max"] ?? "1")})`
         : "";
     return `Found ${tags || "matching"} acts near the venue${band}`;
   }
@@ -65,7 +70,7 @@ export function describeReceipt(r: QlooReceipt, names: Map<string, string>): Rec
 
   const params = Object.entries(p).map(([k, v]): [string, string] => [
     k,
-    k.endsWith(".entities") || k.endsWith(".tags") ? list(v, names) : v,
+    k.endsWith(".entities") || k.endsWith(".tags") ? list(v, names) : shortNumber(v),
   ]);
   const query = new URLSearchParams(p).toString();
   return { title, params, request: `GET ${r.path}?${query}` };

@@ -45,6 +45,7 @@ export function analyticsInputFromPitch(pitch: PitchPayload): {
   headlinerPopularity?: number;
   openerPopularity?: number;
   tagLabels?: string[];
+  crowdDemographics?: PitchPayload["crowdDemographics"];
 } | null {
   const cityQuery = pitch.meta?.cityQuery ?? pitch.meta?.cityLabel;
   if (!cityQuery) return null;
@@ -69,6 +70,7 @@ export function analyticsInputFromPitch(pitch: PitchPayload): {
     headlinerPopularity: pitch.meta?.headlinerPopularity,
     openerPopularity: pitch.meta?.openerPopularity,
     tagLabels: pitch.meta?.tagLabels,
+    crowdDemographics: pitch.crowdDemographics,
   };
 }
 

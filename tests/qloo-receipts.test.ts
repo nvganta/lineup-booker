@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeReceipt, tagWords } from "@/lib/qloo/receipt-copy";
+import { describeReceipt, shortNumber, tagWords } from "@/lib/qloo/receipt-copy";
 import { currentQlooReceipts, recordQlooCall, withQlooReceipts } from "@/lib/qloo/receipts";
 import { parseSampleRuns } from "@/lib/sample-runs";
 
@@ -44,6 +44,18 @@ describe("Qloo receipts", () => {
     );
     expect(compare.title).toBe("Compared the tastes of Jordan Klassen and Twin Bandit fans");
     expect(tagWords("urn:tag:genre:music:indie_folk")).toBe("indie folk");
+  });
+
+  it("rounds long numbers for display but keeps them exact in the request", () => {
+    expect(shortNumber("0.8014590312")).toBe("0.8");
+    expect(shortNumber("0.655")).toBe("0.66");
+    expect(shortNumber("0.65")).toBe("0.65");
+    expect(shortNumber("20")).toBe("20");
+    expect(shortNumber("POINT(-123.1013 49.2627)")).toBe("POINT(-123.1013 49.2627)");
+    const line = describeReceipt({ path: "/v2/insights", params: { "filter.type": "urn:entity:artist", "signal.interests.tags": "urn:tag:genre:music:indie_folk", "filter.popularity.max": "0.8014590312" }, results: 3, cached: false }, names);
+    expect(line.params).toContainEqual(["filter.popularity.max", "0.8"]);
+    expect(line.title).toContain("(popularity 0–0.8)");
+    expect(line.request).toContain("0.8014590312");
   });
 });
 
