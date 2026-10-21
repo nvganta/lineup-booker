@@ -12,15 +12,13 @@ import {
   TaskItem,
   TaskTrigger,
 } from "@/components/ai-elements/task";
-import {
-  Tool,
-  ToolContent,
-  ToolHeader,
-} from "@/components/ai-elements/tool";
+import { Tool, ToolContent, ToolHeader } from "@/components/ai-elements/tool";
 import type { AgentFinishSummary, StepDataPart } from "@/lib/agent/types";
 import { stepBodyForDisplay } from "@/lib/agent/step-display";
 import { visibleScoutSteps } from "@/lib/agent/scout-steps-display";
+import { fadeUp } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { motion } from "motion/react";
 import { useMemo, useState } from "react";
 
 const TOOL_KINDS = new Set<StepDataPart["kind"]>([
@@ -57,10 +55,7 @@ export function AgentScoutStream({
   const done = Boolean(summary);
   const [open, setOpen] = useState(!collapsedDefault && !done);
 
-  const live = useMemo(
-    () => visibleScoutSteps(steps, done),
-    [steps, done],
-  );
+  const live = useMemo(() => visibleScoutSteps(steps, done), [steps, done]);
 
   if (live.length === 0) return null;
 
@@ -76,43 +71,42 @@ export function AgentScoutStream({
         const isTool = TOOL_KINDS.has(step.kind);
         if (isTool) {
           return (
-            <Tool
-              key={step.id}
-              defaultOpen
-              className="mb-0 border-[#e8dfd6] bg-[#fcf9f5] shadow-none rounded-sm"
-            >
-              <ToolHeader
-                type="dynamic-tool"
-                toolName={step.kind}
-                state={stepStatus(step.status)}
-                title={step.label}
-                className="font-[family-name:var(--font-heading)] text-[#1a1614] [&_svg]:text-[#8c4a32] [&_.rounded-full]:hidden"
-              />
-              {(step.detail || step.evidence) && (
-                <ToolContent className="text-xs text-[#8a7f76] border-t border-[#e8dfd6]">
-                  {step.detail && <p>{step.detail}</p>}
-                  {step.evidence && <p className="mt-1">{step.evidence}</p>}
-                </ToolContent>
-              )}
-            </Tool>
+            <motion.div key={step.id} {...fadeUp}>
+              <Tool
+                defaultOpen
+                className="mb-0 border-[#e8dfd6] bg-[#fcf9f5] shadow-none rounded-sm"
+              >
+                <ToolHeader
+                  type="dynamic-tool"
+                  toolName={step.kind}
+                  state={stepStatus(step.status)}
+                  title={step.label}
+                  className="font-[family-name:var(--font-heading)] text-[#1a1614] [&_svg]:text-[#8c4a32] [&_.rounded-full]:hidden"
+                />
+                {(step.detail || step.evidence) && (
+                  <ToolContent className="text-xs text-[#8a7f76] border-t border-[#e8dfd6]">
+                    {step.detail && <p>{step.detail}</p>}
+                    {step.evidence && <p className="mt-1">{step.evidence}</p>}
+                  </ToolContent>
+                )}
+              </Tool>
+            </motion.div>
           );
         }
         return (
-          <Task
-            key={step.id}
-            defaultOpen
-            className="border-0 bg-transparent p-0"
-          >
-            <TaskTrigger
-              title={step.label}
-              className="font-[family-name:var(--font-heading)] text-[#1a1614] [&_svg]:hidden pointer-events-none"
-            />
-            {bodyText && (
-              <TaskContent className="pl-0">
-                <TaskItem className="text-[#5c534d]">{bodyText}</TaskItem>
-              </TaskContent>
-            )}
-          </Task>
+          <motion.div key={step.id} {...fadeUp}>
+            <Task defaultOpen className="border-0 bg-transparent p-0">
+              <TaskTrigger
+                title={step.label}
+                className="font-[family-name:var(--font-heading)] text-[#1a1614] [&_svg]:hidden pointer-events-none"
+              />
+              {bodyText && (
+                <TaskContent className="pl-0">
+                  <TaskItem className="text-[#5c534d]">{bodyText}</TaskItem>
+                </TaskContent>
+              )}
+            </Task>
+          </motion.div>
         );
       })}
     </div>

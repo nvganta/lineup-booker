@@ -1,5 +1,7 @@
 import type { GeocodeResult } from "@/lib/geocode/nominatim";
+import { ordinal } from "@/lib/copy/ordinal";
 import { artistOriginMatchesVenue, cityLabelsEquivalent, type VenuePin } from "@/lib/lineup/geography";
+import type { PopularityBand } from "@/lib/lineup/tiers";
 
 export type PlainForm = { concept: string; address: string; regulars: string };
 
@@ -11,12 +13,20 @@ export type PlainAnswer = {
   neighbourhoods: string[];
 };
 
-/** A check we could make with real data. `ok` false means the claim is wrong. */
-export type Mark = { ok: boolean; text: string };
+/**
+ * A check we could make with real data. `ok` false means the claim is wrong;
+ * `soft` means it isn't wrong, just not backed by Qloo.
+ */
+export type Mark = { ok: boolean; text: string; soft?: boolean };
+
+export type Point = { lat: number; lon: number };
 
 export type PlainResult = {
   modelId: string;
   answer: PlainAnswer;
+  headlinerImageUrl?: string;
+  /** Where each plain neighbourhood geocoded to, for the client-side Qloo overlap check. */
+  points: Array<Point | null>;
   marks: {
     headliner: Mark[];
     opener: Mark[];
@@ -85,14 +95,31 @@ export function claimsLocal(a: PlainAct, city: string): boolean {
   return new RegExp(`\\b(local|hometown|${c}[- ]based|from ${c}|${c}['’]s own|${c}(?: [a-z-]+){0,3} (?:band|act|artist|singer|duo|trio|group|collective|songwriter|outfit|musician)s?)\\b`, "i").test(a.why);
 }
 
-/** Origin from Wikipedia or MusicBrainz, checked only when the answer claims the act is local. */
-export function markOrigin(a: PlainAct, origin: string | undefined, pin: VenuePin): Mark[] {
-  if (!origin || !claimsLocal(a, pin.displayCity || pin.city)) return [];
+/**
+ * Origin from Wikipedia or MusicBrainz, checked only when the answer claims the act is local.
+ * The prompt asks for a local opener, so the opener's claim is implied: pass `claimed`.
+ */
+export function markOrigin(a: PlainAct, origin: string | undefined, pin: VenuePin, claimed = false): Mark[] {
+  if (!origin || !(claimed || claimsLocal(a, pin.displayCity || pin.city))) return [];
   // "United Kingdom" alone can't say whether an act is from London: leave it unmarked.
   if (!origin.includes(",")) return [];
   return artistOriginMatchesVenue(origin, pin)
     ? [{ ok: true, text: `From ${origin}` }]
     : [{ ok: false, text: `From ${origin}` }];
+}
+
+/** Qloo popularity against the same room band the scout uses to pick its own headliner. */
+export function markRoomFit(popularity: number | undefined, band: PopularityBand): Mark[] {
+  if (popularity == null) return [];
+  const pct = `${ordinal(popularity * 100)} percentile on Qloo`;
+  const room = band.seatCapacity ? `a ${band.seatCapacity}-cap room` : "this room";
+  if (band.headlinerMax != null && popularity > band.headlinerMax) {
+    return [{ ok: false, text: `Too big for ${room} · ${pct}` }];
+  }
+  if (band.headlinerMin != null && popularity < band.headlinerMin) {
+    return [{ ok: false, text: `Too small to headline · ${pct}` }];
+  }
+  return [{ ok: true, text: `Fits ${room} · ${pct}` }];
 }
 
 /** A neighbourhood is marked only when the map lookup says it is a street or outside the city. */

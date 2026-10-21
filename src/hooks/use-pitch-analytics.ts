@@ -4,6 +4,7 @@ import type { PitchPayload } from "@/lib/agent/types";
 import type { PitchAnalytics } from "@/lib/lineup/pitch-analytics";
 import type { LineupResult } from "@/lib/lineup/build-lineup";
 import type { LineupRequest } from "@/lib/lineup/schemas";
+import { SAMPLE_RUNS } from "@/lib/sample-runs";
 import { cityFromRequest } from "@/lib/stored-lineups";
 import { useEffect, useMemo, useState } from "react";
 
@@ -104,6 +105,16 @@ async function fetchAnalytics(
   return json.analytics;
 }
 
+/**
+ * Analytics already fetched this session, keyed by input. Each fetch costs
+ * several Qloo calls, and the poster remounts whenever you switch lineups.
+ */
+const analyticsMemo = new Map<string, PitchAnalytics>();
+for (const run of Object.values(SAMPLE_RUNS)) {
+  const input = analyticsInputFromPitch(run.pitch);
+  if (input) analyticsMemo.set(JSON.stringify(input), run.analytics);
+}
+
 export function usePitchAnalytics(
   input: ReturnType<typeof analyticsInputFromPitch>,
   refreshKey = 0,
@@ -112,10 +123,11 @@ export function usePitchAnalytics(
     () => (input ? JSON.stringify({ ...input, refreshKey }) : ""),
     [input, refreshKey],
   );
+  const memoKey = useMemo(() => (input ? JSON.stringify(input) : ""), [input]);
   const [state, setState] = useState<AnalyticsState>({ status: "idle" });
 
   useEffect(() => {
-    if (!inputKey) return;
+    if (!inputKey || analyticsMemo.has(memoKey)) return;
     let cancelled = false;
     void Promise.resolve().then(() => {
       if (!cancelled) setState({ status: "loading" });
@@ -130,6 +142,7 @@ export function usePitchAnalytics(
       })(),
     )
       .then((data) => {
+        analyticsMemo.set(memoKey, data);
         if (!cancelled) setState({ status: "ready", data });
       })
       .catch(() => {
@@ -138,8 +151,9 @@ export function usePitchAnalytics(
     return () => {
       cancelled = true;
     };
-  }, [inputKey]);
+  }, [inputKey, memoKey]);
 
   if (!input) return { status: "idle" };
-  return state;
+  const remembered = analyticsMemo.get(memoKey);
+  return remembered ? { status: "ready", data: remembered } : state;
 }

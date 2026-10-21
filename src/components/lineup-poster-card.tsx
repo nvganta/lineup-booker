@@ -1,9 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { motion } from "motion/react";
+import { AnimatePresence, animate, motion } from "motion/react";
 import { toPng } from "html-to-image";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PitchPayload } from "@/lib/agent/types";
 import { ArtistPhoto } from "@/components/artist-photo";
 import { HeadlinerHero } from "@/components/headliner-hero";
@@ -35,6 +35,7 @@ import { applyOpenerSwap } from "@/lib/lineup/opener-swap-state";
 import { stripCityFromNeighborhoodLabel } from "@/lib/lineup/neighborhood-display";
 import { CompareSwitch, WithoutQlooView } from "@/components/without-qloo-view";
 import { BookItView } from "@/components/book-it-view";
+import { ENTER, fadeUp } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 const LineupMap = dynamic(
@@ -87,10 +88,7 @@ export function LineupPosterCard({
   const analytics =
     analyticsState.status === "ready" ? analyticsState.data : null;
 
-  const whyByActId = whyCacheForPosterRun(
-    posterRunWhyKey(pitch),
-    analytics,
-  );
+  const whyByActId = whyCacheForPosterRun(posterRunWhyKey(pitch), analytics);
 
   const venueCity =
     pitch.meta?.cityLabel?.trim() || cityHintFromAddress(pitch.address);
@@ -99,9 +97,9 @@ export function LineupPosterCard({
     analytics?.acts.find((a) => a.id === pitch.headliner.id)?.whyLine ??
     null;
   const openerReachLine = pitch.opener
-    ? whyLineForAct(whyByActId, pitch.opener.id) ??
+    ? (whyLineForAct(whyByActId, pitch.opener.id) ??
       analytics?.acts.find((a) => a.id === pitch.opener!.id)?.whyLine ??
-      null
+      null)
     : null;
 
   const swapNext = pitch.openerSwapQueue?.[0];
@@ -190,7 +188,10 @@ export function LineupPosterCard({
     for (const t of styleTags) {
       if (seenWords.length >= 2) break;
       const words = new Set(
-        t.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w && w !== "and"),
+        t
+          .toLowerCase()
+          .split(/[^a-z0-9]+/)
+          .filter((w) => w && w !== "and"),
       );
       if (seenWords.some((w) => [...words].every((x) => w.has(x)))) continue;
       seenWords.push(words);
@@ -215,7 +216,15 @@ export function LineupPosterCard({
       if (top) chips.push(`${top.label} crowd`);
     }
     return chips;
-  }, [styleTags, crowdLine, pitch.opener, pitch.headliner, localActIds, venueCity, insightsState]);
+  }, [
+    styleTags,
+    crowdLine,
+    pitch.opener,
+    pitch.headliner,
+    localActIds,
+    venueCity,
+    insightsState,
+  ]);
 
   const plainForm = useMemo(
     () => ({
@@ -223,7 +232,12 @@ export function LineupPosterCard({
       address: pitch.address,
       regulars: pitch.meta?.regularsLove?.trim() || "",
     }),
-    [pitch.meta?.concept, pitch.meta?.regularsLove, pitch.venueLabel, pitch.address],
+    [
+      pitch.meta?.concept,
+      pitch.meta?.regularsLove,
+      pitch.venueLabel,
+      pitch.address,
+    ],
   );
   const bookingInput = useMemo(
     () => ({
@@ -236,13 +250,34 @@ export function LineupPosterCard({
       styleTags,
       rows: [],
     }),
-    [pitch.headliner.name, pitch.opener?.name, pitch.venueLabel, pitch.address, insightsInput, venueCity, styleTags],
+    [
+      pitch.headliner.name,
+      pitch.opener?.name,
+      pitch.venueLabel,
+      pitch.address,
+      insightsInput,
+      venueCity,
+      styleTags,
+    ],
   );
   const handleBook = useCallback(() => {
     setBooking(true);
     setCompare(false);
     setVenueTabsOpened(true);
   }, []);
+
+  // The lineup panel stays mounted (map, poster export) and is only hidden, so
+  // coming back to it replays the same fade the other panels get on mount.
+  const lineupVisible = tab === "lineup" && !compare && !booking;
+  const lineupShownOnce = useRef(lineupVisible);
+  useEffect(() => {
+    if (!lineupVisible || !cardRef.current) return;
+    if (!lineupShownOnce.current) {
+      lineupShownOnce.current = true;
+      return;
+    }
+    animate(cardRef.current, { opacity: [0, 1], y: [6, 0] }, ENTER);
+  }, [lineupVisible]);
 
   const handleTab = useCallback((t: ResultTab) => {
     setTab(t);
@@ -292,11 +327,11 @@ export function LineupPosterCard({
       <motion.div
         initial={animateSettle ? { opacity: 0, y: 10 } : false}
         animate={animateSettle ? { opacity: 1, y: 0 } : undefined}
-        transition={{ duration: 0.55, ease: "easeOut" }}
+        transition={{ ...ENTER, duration: 0.45 }}
       >
         <div
           ref={cardRef}
-          className={cn("space-y-3", (tab !== "lineup" || compare || booking) && "hidden")}
+          className={cn("space-y-3", !lineupVisible && "hidden")}
           data-tab-panel="lineup"
         >
           <article className={articleClass}>
@@ -313,41 +348,50 @@ export function LineupPosterCard({
               whyLine={headlinerWhyLine}
             />
 
-            {pitch.opener && (
-              <section className="px-5 py-3 flex gap-3 items-center">
-                <ArtistPhoto
-                  name={pitch.opener.name}
-                  imageUrl={pitch.opener.imageUrl}
-                  rounded="full"
-                  className="h-12 w-12 text-base shrink-0"
-                />
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-[10px] uppercase tracking-[0.22em] text-[#6b5c52]">
-                      Opener
+            <AnimatePresence mode="popLayout" initial={false}>
+              {pitch.opener && (
+                <motion.section
+                  key={pitch.opener.id}
+                  initial={{ opacity: 0, x: 12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -12 }}
+                  transition={ENTER}
+                  className="px-5 py-3 flex gap-3 items-center"
+                >
+                  <ArtistPhoto
+                    name={pitch.opener.name}
+                    imageUrl={pitch.opener.imageUrl}
+                    rounded="full"
+                    className="h-12 w-12 text-base shrink-0"
+                  />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-[10px] uppercase tracking-[0.22em] text-[#6b5c52]">
+                        Opener
+                      </p>
+                      {showLocalBadge && (
+                        <Badge className="rounded-full bg-[#8c4a32]/10 text-[#8c4a32] border-0 text-[10px] uppercase tracking-wide hover:bg-[#8c4a32]/10">
+                          Local
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="font-heading text-lg leading-tight">
+                      {pitch.opener.name}
                     </p>
-                    {showLocalBadge && (
-                      <Badge className="rounded-full bg-[#8c4a32]/10 text-[#8c4a32] border-0 text-[10px] uppercase tracking-wide hover:bg-[#8c4a32]/10">
-                        Local
-                      </Badge>
+                    {openerReachLine && !pitch.openerWhy?.trim() && (
+                      <p className="text-xs text-[#5c534d] mt-0.5">
+                        {openerReachLine}
+                      </p>
+                    )}
+                    {pitch.openerWhy?.trim() && (
+                      <p className="text-xs text-[#6b5c52] mt-0.5 italic">
+                        {pitch.openerWhy.trim()}
+                      </p>
                     )}
                   </div>
-                  <p className="font-heading text-lg leading-tight">
-                    {pitch.opener.name}
-                  </p>
-                  {openerReachLine && !pitch.openerWhy?.trim() && (
-                    <p className="text-xs text-[#5c534d] mt-0.5">
-                      {openerReachLine}
-                    </p>
-                  )}
-                  {pitch.openerWhy?.trim() && (
-                    <p className="text-xs text-[#6b5c52] mt-0.5 italic">
-                      {pitch.openerWhy.trim()}
-                    </p>
-                  )}
-                </div>
-              </section>
-            )}
+                </motion.section>
+              )}
+            </AnimatePresence>
           </article>
 
           <article className={articleClass}>
@@ -449,44 +493,53 @@ export function LineupPosterCard({
         )}
 
         {tab === "lineup" && booking && (
-          <BookItView
-            input={bookingInput}
-            insights={insightsState}
-            fileSlug={slugifyFilename(pitch.venueLabel)}
-            onBack={() => setBooking(false)}
-          />
+          <motion.div key="book" {...fadeUp}>
+            <BookItView
+              input={bookingInput}
+              insights={insightsState}
+              fileSlug={slugifyFilename(pitch.venueLabel)}
+              onBack={() => setBooking(false)}
+            />
+          </motion.div>
         )}
 
         {tab === "food" && (
-          <FoodDealsView
-            state={insightsState}
-            headlinerName={pitch.headliner.name}
-            cityLabel={
-              (insightsState.status === "ready" && insightsState.places.cityLabel) ||
-              insightsInput?.cityLabel ||
-              venueCity ||
-              ""
-            }
-          />
+          <motion.div key="food" {...fadeUp}>
+            <FoodDealsView
+              state={insightsState}
+              headlinerName={pitch.headliner.name}
+              cityLabel={
+                (insightsState.status === "ready" &&
+                  insightsState.places.cityLabel) ||
+                insightsInput?.cityLabel ||
+                venueCity ||
+                ""
+              }
+            />
+          </motion.div>
         )}
 
         {tab === "marketing" && (
-          <MarketingView
-            state={insightsState}
-            pitch={pitch}
-            cityLabel={insightsInput?.cityLabel ?? venueCity ?? ""}
-            street={street}
-            leadWith={leadWith}
-          />
+          <motion.div key="marketing" {...fadeUp}>
+            <MarketingView
+              state={insightsState}
+              pitch={pitch}
+              cityLabel={insightsInput?.cityLabel ?? venueCity ?? ""}
+              street={street}
+              leadWith={leadWith}
+            />
+          </motion.div>
         )}
 
         {tab === "data" && (
-          <article className={articleClass} data-tab-panel="data">
-            <LineupDataView
-              pitch={pitch}
-              analytics={analytics}
-            />
-          </article>
+          <motion.article
+            key="data"
+            {...fadeUp}
+            className={articleClass}
+            data-tab-panel="data"
+          >
+            <LineupDataView pitch={pitch} analytics={analytics} />
+          </motion.article>
         )}
       </motion.div>
     </div>

@@ -4,8 +4,10 @@ import { ArtistPhoto } from "@/components/artist-photo";
 import type { ExampleVenue } from "@/lib/example-venues";
 import type { StoredLineup } from "@/lib/stored-lineups";
 import type { LineupRequest } from "@/lib/lineup/schemas";
+import { INDICATOR } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { Star } from "lucide-react";
+import { motion } from "motion/react";
 
 type Props = {
   samples: ExampleVenue[];
@@ -50,15 +52,23 @@ function RailButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "w-full text-left rounded-md px-3 py-2.5 text-sm transition-colors disabled:opacity-50 flex gap-2.5 items-start",
-        active
-          ? "bg-[#8c4a32]/12 text-[#1a1614] border border-[#8c4a32]/25"
-          : "text-[#5c534d] hover:bg-[#faf7f2] border border-transparent",
+        "relative w-full text-left rounded-md px-3 py-2.5 text-sm flex gap-2.5 items-start",
+        "transition-[color,background-color,transform] duration-200 ease-out active:scale-[0.98] disabled:opacity-50",
+        active ? "text-[#1a1614]" : "text-[#5c534d] hover:bg-[#faf7f2]",
         className,
       )}
     >
-      {leading}
-      <span className="min-w-0 flex-1">
+      {/* One shared highlight that slides between rows instead of blinking. */}
+      {active && (
+        <motion.span
+          layoutId="rail-active"
+          transition={INDICATOR}
+          className="absolute inset-0 rounded-md bg-[#8c4a32]/12 border border-[#8c4a32]/25"
+          aria-hidden
+        />
+      )}
+      {leading && <span className="relative">{leading}</span>}
+      <span className="relative min-w-0 flex-1">
         <span className="font-medium block leading-snug">{label}</span>
         {sub ? (
           <span className="text-[11px] text-[#8a7f76] line-clamp-2 mt-0.5 block">
@@ -66,7 +76,7 @@ function RailButton({
           </span>
         ) : null}
       </span>
-      {trailing}
+      {trailing && <span className="relative">{trailing}</span>}
     </button>
   );
 }
@@ -87,7 +97,7 @@ export function LineupSampleRailDesktop({
     <aside className="hidden lg:flex flex-col w-56 xl:w-64 shrink-0 border-r border-[#e8dfd6] bg-[#f3ece4]/80 min-h-0 overflow-hidden">
       <div className="p-4 border-b border-[#e8dfd6] shrink-0">
         <p className="text-[10px] uppercase tracking-[0.24em] text-[#8c4a32]">
-          Samples
+          Example rooms
         </p>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2 space-y-1">
@@ -173,7 +183,7 @@ export function LineupSampleRailMobile({
   return (
     <div className="lg:hidden shrink-0 border-b border-[#e8dfd6] bg-[#f3ece4]/60 px-4 py-3">
       <p className="text-[10px] uppercase tracking-[0.22em] text-[#8c4a32] mb-2">
-        Samples & your lineups
+        Example rooms &amp; your lineups
       </p>
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x snap-mandatory">
         {chips.map((chip) => (
@@ -183,7 +193,8 @@ export function LineupSampleRailMobile({
             disabled={disabled}
             onClick={chip.onClick}
             className={cn(
-              "snap-start shrink-0 max-w-[14rem] rounded-full border px-3 py-1.5 text-xs text-left transition-colors disabled:opacity-50",
+              "snap-start shrink-0 max-w-[14rem] rounded-full border px-3 py-1.5 text-xs text-left disabled:opacity-50",
+              "transition-[color,background-color,border-color,transform] duration-200 ease-out active:scale-[0.97]",
               chip.active
                 ? "border-[#8c4a32]/40 bg-[#8c4a32]/10 text-[#1a1614]"
                 : "border-[#e0d5ca] bg-[#fcf9f5] text-[#1a1614]",

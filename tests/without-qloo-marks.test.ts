@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { claimsLocal, markNeighbourhood, markOrigin, parsePlainAnswer } from "@/lib/compare/without-qloo";
+import { markAgainstQloo } from "@/lib/compare/qloo-overlap";
+import { claimsLocal, markNeighbourhood, markOrigin, markRoomFit, parsePlainAnswer } from "@/lib/compare/without-qloo";
+import { popularityBandFromConcept } from "@/lib/lineup/tiers";
 import type { VenuePin } from "@/lib/lineup/geography";
 
 const pin = { lat: 49.26, lon: -123.1, city: "Vancouver", displayCity: "Vancouver", country: "Canada" } as VenuePin;
@@ -36,5 +38,30 @@ describe("without Qloo marks", () => {
     expect(markNeighbourhood({ ...base, cityForHeatmap: "Vancouver", placeClass: "place" }, pin)).toBeNull();
     expect(markNeighbourhood({ ...base, cityForHeatmap: "Burnaby", placeClass: "amenity" }, pin)).toBeNull();
     expect(markNeighbourhood(null, pin)).toBeNull();
+  });
+
+  it("checks the opener's hometown because the prompt asked for a local one", () => {
+    const quiet = { name: "Fern Static", why: "folk", local: false };
+    expect(markOrigin(quiet, "Norwich, England", pin, true)).toEqual([{ ok: false, text: "From Norwich, England" }]);
+  });
+
+  it("marks a headliner against the room's popularity band", () => {
+    const band = popularityBandFromConcept("Cafe-bar, 300 capacity");
+    expect(markRoomFit(0.47, band)).toEqual([{ ok: false, text: "Too small to headline · 47th percentile on Qloo" }]);
+    expect(markRoomFit(0.97, band)).toEqual([{ ok: false, text: "Too big for a 300-cap room · 97th percentile on Qloo" }]);
+    expect(markRoomFit(0.8, band)).toEqual([{ ok: true, text: "Fits a 300-cap room · 80th percentile on Qloo" }]);
+    expect(markRoomFit(undefined, band)).toEqual([]);
+  });
+
+  it("matches a poster spot to a Qloo pick by name or by a nearby pin", () => {
+    const qloo = [
+      { rank: 1, name: "Mount Pleasant", lat: 49.2627, lon: -123.1013 },
+      { rank: 3, name: "Downtown Eastside", lat: 49.2824, lon: -123.0995 },
+    ];
+    expect(markAgainstQloo("Mount-Pleasant", null, qloo)).toEqual({ ok: true, text: "Qloo #1" });
+    expect(markAgainstQloo("Main & Broadway", { lat: 49.2628, lon: -123.1009 }, qloo)).toEqual({ ok: true, text: "Qloo #1" });
+    // Gastown sits 0.5 km from Downtown Eastside's centroid: a neighbour, not the same area.
+    expect(markAgainstQloo("Gastown", { lat: 49.2837, lon: -123.1062 }, qloo)).toEqual({ ok: false, soft: true, text: "not in Qloo's top 5" });
+    expect(markAgainstQloo("Nowhere", null, qloo)).toBeNull();
   });
 });

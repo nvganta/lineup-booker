@@ -3,20 +3,8 @@ import { generateText } from "ai";
 import { z } from "zod";
 import { agentModelChain } from "@/lib/agent/model";
 import { getPersistentStore } from "@/lib/cache/persistent-store";
-import {
-  markNeighbourhood,
-  markOrigin,
-  parsePlainAnswer,
-  plainPrompt,
-  type PlainResult,
-} from "@/lib/compare/without-qloo";
-import {
-  displayCityLabelFromGeocode,
-  geocodeLocation,
-  geocodeWithRetries,
-} from "@/lib/geocode/nominatim";
-import { lookupArtistOrigin } from "@/lib/lineup/artist-origin-lookup";
-import type { VenuePin } from "@/lib/lineup/geography";
+import { checkPlainAnswer } from "@/lib/compare/check-plain";
+import { parsePlainAnswer, plainPrompt, type PlainResult } from "@/lib/compare/without-qloo";
 
 export const maxDuration = 60;
 
@@ -32,10 +20,10 @@ function key(form: z.infer<typeof body>): string {
   const raw = JSON.stringify({ ...form, v: 1 });
   let h = 0;
   for (let i = 0; i < raw.length; i++) h = (h * 31 + raw.charCodeAt(i)) | 0;
-  return `without-qloo:v2:${(h >>> 0).toString(36)}:${raw.length}`;
+  return `without-qloo:v3:${(h >>> 0).toString(36)}:${raw.length}`;
 }
 
-/** The same free model, asked with only the form fields. No Qloo calls. */
+/** The same model, asked with only the form fields, then checked: one Qloo call for the headliner. */
 export async function POST(req: Request) {
   const parsed = body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "bad request" }, { status: 400 });
@@ -68,37 +56,7 @@ export async function POST(req: Request) {
   const answer = result ? parsePlainAnswer(result.text) : null;
   if (!result || !answer) return Response.json({ error: "no answer" }, { status: 502 });
 
-  const geo = await geocodeWithRetries(form.address).catch(() => null);
-  const marks: PlainResult["marks"] = {
-    headliner: [],
-    opener: [],
-    neighbourhoods: answer.neighbourhoods.map(() => null),
-  };
-  if (geo) {
-    const pin: VenuePin = {
-      lat: geo.lat,
-      lon: geo.lon,
-      city: geo.cityForHeatmap,
-      displayCity: displayCityLabelFromGeocode(geo),
-      state: geo.state,
-      country: geo.country,
-      county: geo.county,
-      stateDistrict: geo.stateDistrict,
-      borough: geo.address?.borough ?? geo.address?.city_district,
-    };
-    const [hOrigin, oOrigin] = await Promise.all([
-      lookupArtistOrigin(answer.headliner.name, undefined, 2500),
-      answer.opener ? lookupArtistOrigin(answer.opener.name, undefined, 2500) : Promise.resolve(undefined),
-    ]);
-    marks.headliner = markOrigin(answer.headliner, hOrigin, pin);
-    if (answer.opener) marks.opener = markOrigin(answer.opener, oOrigin, pin);
-    const city = pin.displayCity || pin.city;
-    for (const [i, n] of answer.neighbourhoods.entries()) {
-      const g = await geocodeLocation(`${n}, ${city}`).catch(() => null);
-      marks.neighbourhoods[i] = markNeighbourhood(g, pin);
-    }
-  }
-  const out: PlainResult = { modelId: result.modelId, answer, marks };
+  const out: PlainResult = { modelId: result.modelId, answer, ...(await checkPlainAnswer(answer, form)) };
   await store.set(k, out, TTL_MS);
   return Response.json(out);
 }

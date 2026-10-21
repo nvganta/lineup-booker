@@ -5,23 +5,32 @@ import { AgentStreamingPoster } from "@/components/agent-streaming-poster";
 import { LineupPosterCard } from "@/components/lineup-poster-card";
 import type { AgentStreamState } from "@/lib/agent/consume-agent-stream";
 import type { PitchPayload } from "@/lib/agent/types";
-import type { LineupResult } from "@/lib/lineup/build-lineup";
-import { lineupResultToPitch } from "@/lib/lineup/lineup-to-pitch";
 import {
   FEED_BLOCK_CLASS,
   FEED_CARD_CLASS,
 } from "@/components/feed-column-layout";
 import { cn } from "@/lib/utils";
 import type { LineupRequest } from "@/lib/lineup/schemas";
+import { fadeUp } from "@/lib/motion";
+import { motion } from "motion/react";
 
-function PreviewSkeleton() {
+function EmptyState() {
   return (
-    <div
+    <motion.div
+      {...fadeUp}
       className={cn(
         FEED_BLOCK_CLASS,
-        "rounded-sm border border-[#e8dfd6] bg-[#f7f2eb] p-5 min-h-[420px]",
+        "rounded-sm border border-dashed border-[#e0d5ca] p-8 min-h-[280px] flex flex-col items-center justify-center text-center",
       )}
-    />
+    >
+      <p className="font-heading text-xl text-[#1a1614]">
+        Your night shows up here
+      </p>
+      <p className="mt-1.5 max-w-xs text-sm text-[#8a7f76]">
+        Describe your room and the scout picks a headliner, a local opener, and
+        where to put the posters up.
+      </p>
+    </motion.div>
   );
 }
 
@@ -30,9 +39,10 @@ type Props = {
   error: string | null;
   agentState: AgentStreamState | null;
   form: LineupRequest;
-  openingSample: LineupResult | null;
-  openingLoading: boolean;
   savedPitch: PitchPayload | null;
+  /** Set when the saved pitch is a stored example run, not one scouted just now. */
+  savedVenue?: { lat: number; lon: number };
+  savedRunDate?: string;
   className?: string;
   scrollRef?: React.RefObject<HTMLElement | null>;
 };
@@ -42,14 +52,14 @@ export function LineupResultPane({
   error,
   agentState,
   form,
-  openingSample,
-  openingLoading,
   savedPitch,
+  savedVenue,
+  savedRunDate,
   className,
   scrollRef,
 }: Props) {
   const pitch = savedPitch ?? agentState?.pitch;
-  const showPreview = !loading && !pitch && !error;
+  const showEmpty = !loading && !pitch && !error;
 
   return (
     <section
@@ -75,29 +85,27 @@ export function LineupResultPane({
       )}
 
       {loading && agentState && (
-        <div className={FEED_BLOCK_CLASS}>
-          <AgentScoutStream
-            steps={agentState.steps}
-            className="mb-4"
-          />
+        <motion.div {...fadeUp} className={FEED_BLOCK_CLASS}>
+          <AgentScoutStream steps={agentState.steps} className="mb-4" />
           <AgentStreamingPoster
             state={agentState}
             venueConcept={form.concept}
             className={FEED_CARD_CLASS}
           />
-        </div>
+        </motion.div>
       )}
 
       {loading && !agentState && (
-        <div
+        <motion.div
+          {...fadeUp}
           className={cn(
             FEED_BLOCK_CLASS,
             "rounded-sm border border-[#e8dfd6] bg-[#f7f2eb] p-6 min-h-[280px] flex items-center justify-center text-sm text-[#8a7f76]",
           )}
           aria-busy="true"
         >
-          Connecting to scout…
-        </div>
+          <span className="animate-pulse">Connecting to scout…</span>
+        </motion.div>
       )}
 
       {!loading && pitch && (
@@ -111,35 +119,16 @@ export function LineupResultPane({
           <LineupPosterCard
             key={`${pitch.headliner.id}:${pitch.opener?.id ?? "none"}:${pitch.address}`}
             pitch={pitch}
-            venue={agentState?.map?.venue}
+            venue={agentState?.map?.venue ?? savedVenue}
             className={FEED_CARD_CLASS}
             wideFeed
             animateSettle
+            previewBadge={savedRunDate ? "saved-run" : null}
           />
         </div>
       )}
 
-      {showPreview && openingLoading && <PreviewSkeleton />}
-
-      {showPreview && !openingLoading && openingSample && (
-        <div className={FEED_BLOCK_CLASS}>
-          <LineupPosterCard
-            key={`saved:${openingSample.headliner.id}`}
-            pitch={lineupResultToPitch(openingSample, form)}
-            venue={
-              openingSample.venue
-                ? {
-                    lat: openingSample.venue.lat,
-                    lon: openingSample.venue.lon,
-                  }
-                : undefined
-            }
-            previewBadge="saved-run"
-            className={FEED_CARD_CLASS}
-            wideFeed
-          />
-        </div>
-      )}
+      {showEmpty && <EmptyState />}
     </section>
   );
 }
