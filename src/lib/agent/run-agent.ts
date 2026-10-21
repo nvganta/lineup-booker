@@ -21,6 +21,7 @@ import {
 } from "./runtime";
 import { createStreamWriter } from "./stream-writer";
 import { buildAgentTools } from "./tools";
+import { regularsPhrases, runScoutSetup, scoutBrief } from "./scout-setup";
 import { AGENT_SYSTEM_PROMPT, agentUserPrompt } from "./system-prompt";
 import { runQuickMode } from "./quick-mode";
 import { salvagePitch } from "./salvage-pitch";
@@ -33,10 +34,17 @@ import { RESEARCH_TOTAL_MS } from "./research/types";
 import { validatePitchPayload } from "./pitch-validator";
 import {
   isGatewayRateLimitError,
+  isModelStallError,
   isModelUnavailableError,
 } from "./model-fallback";
 
 export const maxDuration = 60;
+
+/**
+ * A step that hasn't produced its first chunk by now is stalled (free models
+ * queue), so the next model takes over instead of the stall eating the run.
+ */
+const FIRST_CHUNK_MS = 9_000;
 
 function hasGateway(): boolean {
   return Boolean(process.env.AI_GATEWAY_API_KEY || process.env.VERCEL);
@@ -129,12 +137,15 @@ function streamAgentText(
   return streamText({
     model: gateway(modelId),
     maxRetries: 0,
+    timeout: { firstChunkMs: FIRST_CHUNK_MS },
     // The real gateway error (rate limit, unavailable) only arrives here;
     // `await result.text` just rejects with NoOutputGeneratedError.
     onError: ({ error }) => onStreamError(error),
     temperature: AGENT_TEMPERATURE,
     system: AGENT_SYSTEM_PROMPT,
-    prompt: agentUserPrompt(input),
+    prompt: `${agentUserPrompt(input)}
+
+${scoutBrief(runtime.session)}`,
     tools: buildAgentTools(),
     stopWhen: [
       stepCountIs(6),
@@ -173,10 +184,13 @@ function streamAgentText(
         };
       }
       if (!s.headlinerEntity) {
+        // Refining tags costs a Qloo call; offer it only when they don't cover what the owner wrote.
+        const thinTags =
+          s.tagIds.length < regularsPhrases(input.regularsLove).length;
         return {
           activeTools: [
             "discover_headliners" as const,
-            "adjacent_genres" as const,
+            ...(thinTags ? ["adjacent_genres" as const] : []),
             "room_size_band" as const,
           ],
           system:
@@ -239,11 +253,21 @@ async function runLlmAgent(
         console.error("[agent] gateway rate limit — salvaging without rotation");
         return;
       }
+      const lastModel = i === modelIds.length - 1;
       if (
-        i < modelIds.length - 1 &&
+        !lastModel &&
         (isModelUnavailableError(streamError) || isModelUnavailableError(err))
       ) {
         console.error("[agent] model unavailable, rotating", modelId);
+        continue;
+      }
+      // The run's own deadline aborts the same way; only a stall inside it rotates.
+      if (
+        !lastModel &&
+        !runtime.budget.pastSoftLimit() &&
+        (isModelStallError(streamError) || isModelStallError(err))
+      ) {
+        console.error("[agent] model stalled, rotating", modelId);
         continue;
       }
       throw err;
@@ -286,6 +310,7 @@ export function createAgentResponse(body: unknown): Response {
           if (!hasGateway()) {
             throw new Error("AI Gateway not configured");
           }
+          await runScoutSetup(buildAgentTools(), input);
           try {
             await runLlmAgent(input, runtime, (s) =>
               writer.merge(s as never),

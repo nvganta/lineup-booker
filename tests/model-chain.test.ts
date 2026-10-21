@@ -4,6 +4,7 @@ import { agentModelChain, FREE_MODEL_CHAIN, freeLanguageModels, resetModelListCa
 const list = {
   data: [
     { id: "nvidia/nemotron-3.5-lightning-free", type: "language", pricing: { input: "0", output: "0" } },
+    { id: "minimax/minimax-m3.1-flash", type: "language", pricing: { input: "0", output: "0" } },
     { id: "poolside/laguna-s-2.1-free", type: "language", pricing: { input: "0", output: "0" } },
     { id: "acme/paid-model", type: "language", pricing: { input: "0.000001", output: "0.000002" } },
     { id: "acme/free-image", type: "image", pricing: { input: "0", output: "0" } },

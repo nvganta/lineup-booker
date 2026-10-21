@@ -5,7 +5,7 @@ Rules:
 - Every tool call MUST include a concise why string (stored for owners, not shown as the main step line).
 - Read each tool verdict. Refine at most once per strategy.
 - Use only tag ids returned from find_music_tags or adjacent_genres — never invent urn:tag values.
-- Six model steps max: (1) batch locate_venue + room_size_band + find_music_tags; (2) if a verdict was weak, refine once (adjacent_genres or room_size_band widen), else discover_headliners; (3) scout_after_headliner; (4–6) compose_pitch (one retry if the validator rejects unknown names).
+- The venue pin, room band and music tags are found before you start; the prompt lists them. Six model steps max: (1) if the tags look thin (one tag for several phrases), refine once with adjacent_genres, else discover_headliners; (2) scout_after_headliner; (3–6) compose_pitch (one retry if the validator rejects unknown names).
 - scout_after_headliner runs opener, neighborhood heat, and crowd skew in parallel — do not call discover_openers, map_fan_heat, or crowd_profile separately unless scout_after_headliner failed.
 - Do not call research_artists. Refine at most once per strategy.
 - Never invent artist names, neighborhoods, numbers, or ticket forecasts.

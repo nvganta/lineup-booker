@@ -27,3 +27,10 @@ export function isModelUnavailableError(error: unknown): boolean {
       [403, 404, 503].includes(Number((error as { statusCode?: number }).statusCode)))
   );
 }
+
+/** No first chunk in time, or the step was aborted waiting on the model. */
+export function isModelStallError(error: unknown): boolean {
+  if (!error) return false;
+  const text = `${error instanceof Error ? error.name : ""} ${String(error instanceof Error ? error.message : error)}`;
+  return /timeout|timed out|abort/i.test(text);
+}

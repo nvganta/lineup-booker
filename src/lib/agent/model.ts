@@ -4,6 +4,7 @@
  */
 export const FREE_MODEL_CHAIN = [
   "nvidia/nemotron-3.5-lightning-free",
+  "minimax/minimax-m3.1-flash",
   "poolside/laguna-s-2.1-free",
 ];
 
