@@ -2,6 +2,7 @@ import { getQlooConfig, QlooApiError, QlooConfigError } from "./config";
 import { getAgentRuntime } from "@/lib/agent/runtime";
 import { mockQlooJsonForUrl } from "./mock-transport";
 import { scheduleQlooRequest } from "./rate-limit";
+import { recordQlooCall } from "./receipts";
 import {
   getCachedQlooResponse,
   setCachedQlooResponse,
@@ -43,6 +44,7 @@ export async function qlooGet<T>(
 
   const cached = await getCachedQlooResponse<T>(url);
   if (cached) {
+    recordQlooCall(path, params, cached, true);
     return {
       data: cached,
       request: { method: "GET", path, query },
@@ -81,6 +83,7 @@ export async function qlooGet<T>(
     if (response.ok) {
       const data = (await response.json()) as T;
       await setCachedQlooResponse(url, data);
+      recordQlooCall(path, params, data, false);
       return {
         data,
         request: { method: "GET", path, query },

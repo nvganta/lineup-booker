@@ -8,16 +8,16 @@ import type { Mark, PlainForm, PlainResult } from "@/lib/compare/without-qloo";
 import { ArtistPhoto } from "@/components/artist-photo";
 import { stripCityFromNeighborhoodLabel } from "@/lib/lineup/neighborhood-display";
 import { ENTER, INDICATOR } from "@/lib/motion";
-import { SAMPLE_RUNS } from "@/lib/sample-runs";
+import type { SampleRun } from "@/lib/sample-runs";
 import { cn } from "@/lib/utils";
 import { Muted, POSTER_ARTICLE_CLASS, SourceNote } from "@/components/venue-tab-parts";
 
 const memo = new Map<string, PlainResult>();
 
-// Saved example rooms answer instantly: no model call, no Qloo call.
-for (const run of Object.values(SAMPLE_RUNS)) {
+/** Saved example rooms answer instantly: no model call, no Qloo call. */
+export function rememberPlainAnswer(run: SampleRun): void {
   const m = run.pitch.meta;
-  memo.set(JSON.stringify({ concept: m?.concept ?? run.pitch.venueLabel, address: run.pitch.address, regulars: m?.regularsLove ?? "" }), run.plain);
+  memo.set(JSON.stringify({ concept: m?.concept?.trim() || run.pitch.venueLabel, address: run.pitch.address, regulars: m?.regularsLove?.trim() || "" }), run.plain);
 }
 
 type State = { status: "loading" } | { status: "ready"; result: PlainResult } | { status: "error" };

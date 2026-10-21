@@ -2,6 +2,7 @@ import type { LineupResult } from "@/lib/lineup/build-lineup";
 import type { CrowdDemographics } from "@/lib/lineup/pitch-analytics";
 import type { PopularityBand } from "@/lib/lineup/tiers";
 import type { VenuePin } from "@/lib/lineup/geography";
+import type { QlooReceipt } from "@/lib/qloo/receipts";
 
 export type VerdictLevel = "good" | "weak" | "fail";
 
@@ -95,6 +96,8 @@ export type PitchPayload = {
   venueLabel: string;
   address: string;
   evidenceFootnotes: Record<string, string>;
+  /** Every Qloo request behind this pitch, for the receipts view. */
+  qlooCalls?: QlooReceipt[];
   /** Next-best openers from scout audit (real rejection reasons). */
   openerSwapQueue?: Array<{
     id: string;

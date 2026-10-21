@@ -4,7 +4,7 @@ import type { PitchPayload } from "@/lib/agent/types";
 import type { PitchAnalytics } from "@/lib/lineup/pitch-analytics";
 import type { LineupResult } from "@/lib/lineup/build-lineup";
 import type { LineupRequest } from "@/lib/lineup/schemas";
-import { SAMPLE_RUNS } from "@/lib/sample-runs";
+import type { SampleRun } from "@/lib/sample-runs";
 import { cityFromRequest } from "@/lib/stored-lineups";
 import { useEffect, useMemo, useState } from "react";
 
@@ -110,7 +110,8 @@ async function fetchAnalytics(
  * several Qloo calls, and the poster remounts whenever you switch lineups.
  */
 const analyticsMemo = new Map<string, PitchAnalytics>();
-for (const run of Object.values(SAMPLE_RUNS)) {
+
+export function rememberAnalytics(run: SampleRun): void {
   const input = analyticsInputFromPitch(run.pitch);
   if (input) analyticsMemo.set(JSON.stringify(input), run.analytics);
 }

@@ -43,6 +43,8 @@ type Props = {
   /** Set when the saved pitch is a stored example run, not one scouted just now. */
   savedVenue?: { lat: number; lon: number };
   savedRunDate?: string;
+  /** The saved example run is still on its way; hold a quiet placeholder instead of the empty state. */
+  sampleLoading?: boolean;
   className?: string;
   scrollRef?: React.RefObject<HTMLElement | null>;
 };
@@ -55,6 +57,7 @@ export function LineupResultPane({
   savedPitch,
   savedVenue,
   savedRunDate,
+  sampleLoading,
   className,
   scrollRef,
 }: Props) {
@@ -128,7 +131,18 @@ export function LineupResultPane({
         </div>
       )}
 
-      {showEmpty && <EmptyState />}
+      {showEmpty &&
+        (sampleLoading ? (
+          <div
+            className={cn(
+              FEED_BLOCK_CLASS,
+              "rounded-sm border border-[#e8dfd6] bg-[#f7f2eb] min-h-[420px] animate-pulse",
+            )}
+            aria-busy="true"
+          />
+        ) : (
+          <EmptyState />
+        ))}
     </section>
   );
 }

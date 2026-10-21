@@ -2,6 +2,7 @@ import {
   buildPitchAnalytics,
   type PitchAnalyticsInput,
 } from "@/lib/lineup/pitch-analytics";
+import { withQlooReceipts } from "@/lib/qloo/receipts";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -41,8 +42,12 @@ export async function POST(req: Request) {
   }
   const input = parsed.data as PitchAnalyticsInput;
   try {
-    const { analytics } = await buildPitchAnalytics(input);
-    return NextResponse.json({ analytics });
+    const { result, receipts } = await withQlooReceipts(() =>
+      buildPitchAnalytics(input),
+    );
+    return NextResponse.json({
+      analytics: { ...result.analytics, qlooCalls: receipts },
+    });
   } catch (err) {
     console.error("[pitch-analytics]", err);
     return NextResponse.json(

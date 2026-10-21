@@ -46,38 +46,43 @@ function RailButton({
   trailing?: React.ReactNode;
   className?: string;
 }) {
+  // The trailing control (pin) sits beside the row button, not inside it:
+  // a button inside a button is invalid HTML and breaks hydration.
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={cn(
-        "relative w-full text-left rounded-md px-3 py-2.5 text-sm flex gap-2.5 items-start",
-        "transition-[color,background-color,transform] duration-200 ease-out active:scale-[0.98] disabled:opacity-50",
-        active ? "text-[#1a1614]" : "text-[#5c534d] hover:bg-[#faf7f2]",
-        className,
-      )}
-    >
-      {/* One shared highlight that slides between rows instead of blinking. */}
-      {active && (
-        <motion.span
-          layoutId="rail-active"
-          transition={INDICATOR}
-          className="absolute inset-0 rounded-md bg-[#8c4a32]/12 border border-[#8c4a32]/25"
-          aria-hidden
-        />
-      )}
-      {leading && <span className="relative">{leading}</span>}
-      <span className="relative min-w-0 flex-1">
-        <span className="font-medium block leading-snug">{label}</span>
-        {sub ? (
-          <span className="text-[11px] text-[#8a7f76] line-clamp-2 mt-0.5 block">
-            {sub}
-          </span>
-        ) : null}
-      </span>
-      {trailing && <span className="relative">{trailing}</span>}
-    </button>
+    <div className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onClick}
+        className={cn(
+          "relative w-full text-left rounded-md px-3 py-2.5 text-sm flex gap-2.5 items-start",
+          trailing && "pr-9",
+          "transition-[color,background-color,transform] duration-200 ease-out active:scale-[0.98] disabled:opacity-50",
+          active ? "text-[#1a1614]" : "text-[#5c534d] hover:bg-[#faf7f2]",
+          className,
+        )}
+      >
+        {/* One shared highlight that slides between rows instead of blinking. */}
+        {active && (
+          <motion.span
+            layoutId="rail-active"
+            transition={INDICATOR}
+            className="absolute inset-0 rounded-md bg-[#8c4a32]/12 border border-[#8c4a32]/25"
+            aria-hidden
+          />
+        )}
+        {leading && <span className="relative">{leading}</span>}
+        <span className="relative min-w-0 flex-1">
+          <span className="font-medium block leading-snug">{label}</span>
+          {sub ? (
+            <span className="text-[11px] text-[#8a7f76] line-clamp-2 mt-0.5 block">
+              {sub}
+            </span>
+          ) : null}
+        </span>
+      </button>
+      {trailing && <span className="absolute right-2 top-2.5">{trailing}</span>}
+    </div>
   );
 }
 
@@ -137,10 +142,7 @@ export function LineupSampleRailDesktop({
                 type="button"
                 className="shrink-0 p-1 text-[#8a7f76] hover:text-[#8c4a32]"
                 aria-label={item.pinned ? "Unpin" : "Pin"}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onTogglePin(item.id);
-                }}
+                onClick={() => onTogglePin(item.id)}
               >
                 <Star
                   className={cn(

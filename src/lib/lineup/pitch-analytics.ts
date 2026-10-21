@@ -1,4 +1,5 @@
 import { qlooGet } from "@/lib/qloo/client";
+import type { QlooReceipt } from "@/lib/qloo/receipts";
 import type {
   QlooEntity,
   QlooInsightsResponse,
@@ -46,6 +47,8 @@ export type PitchAnalytics = {
   demographics: CrowdDemographics | null;
   crowdLine: string | null;
   openerShowLocalBadge: boolean;
+  /** The Qloo requests behind these numbers, for the receipts view. */
+  qlooCalls?: QlooReceipt[];
 };
 
 function entityAffinity(

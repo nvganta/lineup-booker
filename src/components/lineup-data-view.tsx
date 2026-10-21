@@ -2,6 +2,7 @@
 
 import { readableTagLabels } from "@/lib/agent/step-copy";
 import { CrowdSkewBars } from "@/components/crowd-skew-bars";
+import { QlooReceipts } from "@/components/qloo-receipts";
 import type { PitchAnalytics } from "@/lib/lineup/pitch-analytics";
 import type { PitchPayload } from "@/lib/agent/types";
 import {
@@ -55,6 +56,7 @@ export function LineupDataView({
 
   return (
     <div className={cn("px-5 py-5 space-y-6 text-sm", className)}>
+      <QlooReceipts pitch={pitch} analytics={analytics} />
       <section className="space-y-3">
         <p className="text-[10px] uppercase tracking-[0.22em] text-[#6b5c52]">
           Local vs national

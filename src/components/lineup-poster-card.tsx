@@ -77,6 +77,13 @@ export function LineupPosterCard({
   animateSettle,
 }: Props) {
   const [pitch, setPitch] = useState(initialPitch);
+  // A different lineup for the same room keeps this card mounted (same key),
+  // so take the new pitch rather than showing the old one.
+  const [shownPitch, setShownPitch] = useState(initialPitch);
+  if (initialPitch !== shownPitch) {
+    setShownPitch(initialPitch);
+    setPitch(initialPitch);
+  }
   const [analyticsRev, setAnalyticsRev] = useState(0);
   const [tab, setTab] = useState<ResultTab>("lineup");
   const [venueTabsOpened, setVenueTabsOpened] = useState(false);

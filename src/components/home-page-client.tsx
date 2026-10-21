@@ -19,7 +19,9 @@ import {
 import type { PitchPayload } from "@/lib/agent/types";
 import { EXAMPLE_VENUES } from "@/lib/example-venues";
 import type { LineupRequest } from "@/lib/lineup/schemas";
-import { SAMPLE_RUNS, type SampleRun } from "@/lib/sample-runs";
+import { rememberPlainAnswer } from "@/components/without-qloo-view";
+import { rememberAnalytics } from "@/hooks/use-pitch-analytics";
+import type { SampleRun, SampleRuns } from "@/lib/sample-runs";
 import {
   cityFromRequest,
   getServerStoredLineups,
@@ -35,9 +37,12 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 const DEFAULT_REQUEST: LineupRequest = EXAMPLE_VENUES[0]!.request;
 
-function sampleRunFor(request: LineupRequest): SampleRun | null {
+function sampleRunFor(
+  request: LineupRequest,
+  runs: SampleRuns,
+): SampleRun | null {
   return EXAMPLE_VENUES.some((ex) => ex.request === request)
-    ? (SAMPLE_RUNS[request.location] ?? null)
+    ? (runs[request.location] ?? null)
     : null;
 }
 
@@ -52,13 +57,12 @@ export function HomePageClient() {
     loadStoredLineups,
     getServerStoredLineups,
   );
-  // The first example room opens on its saved run: instant, and no Qloo calls on page load.
-  const [savedRun, setSavedRun] = useState<SampleRun | null>(() =>
-    sampleRunFor(DEFAULT_REQUEST),
-  );
-  const [savedPitch, setSavedPitch] = useState<PitchPayload | null>(
-    () => savedRun?.pitch ?? null,
-  );
+  const [sampleRuns, setSampleRuns] = useState<SampleRuns>({});
+  const [sampleRunsLoaded, setSampleRunsLoaded] = useState(false);
+  const [savedRun, setSavedRun] = useState<SampleRun | null>(null);
+  const [savedPitch, setSavedPitch] = useState<PitchPayload | null>(null);
+  // Set once the owner picks, opens or runs anything, so a late sample load can't replace it.
+  const ownerActed = useRef(false);
   const [howOpen, setHowOpen] = useState(false);
   const resultFeedRef = useRef<HTMLElement>(null);
 
@@ -69,8 +73,34 @@ export function HomePageClient() {
     };
   }, []);
 
+  // The first example room opens on its saved run: no Qloo calls on page load.
+  useEffect(() => {
+    let live = true;
+    fetch("/api/sample-runs")
+      .then((r): Promise<SampleRuns> | SampleRuns => (r.ok ? r.json() : {}))
+      .then((runs) => {
+        if (!live) return;
+        for (const run of Object.values(runs)) {
+          rememberPlainAnswer(run);
+          rememberAnalytics(run);
+        }
+        setSampleRuns(runs);
+        const first = sampleRunFor(DEFAULT_REQUEST, runs);
+        if (first && !ownerActed.current) {
+          setSavedRun(first);
+          setSavedPitch(first.pitch);
+        }
+      })
+      .catch(() => {})
+      .finally(() => live && setSampleRunsLoaded(true));
+    return () => {
+      live = false;
+    };
+  }, []);
+
   function selectRequest(request: LineupRequest) {
-    const run = sampleRunFor(request);
+    ownerActed.current = true;
+    const run = sampleRunFor(request, sampleRuns);
     setForm(request);
     setAddressError(null);
     setSavedRun(run);
@@ -80,6 +110,7 @@ export function HomePageClient() {
   }
 
   function openStored(item: StoredLineup) {
+    ownerActed.current = true;
     setForm(item.request);
     setSavedRun(null);
     setSavedPitch(item.pitch);
@@ -89,6 +120,7 @@ export function HomePageClient() {
   }
 
   function handleNewLineup() {
+    ownerActed.current = true;
     setForm(DEFAULT_REQUEST);
     setSavedRun(null);
     setSavedPitch(null);
@@ -113,6 +145,7 @@ export function HomePageClient() {
   }
 
   async function handleSubmit(data: LineupRequest) {
+    ownerActed.current = true;
     setLoading(true);
     setError(null);
     setAddressError(null);
@@ -220,6 +253,7 @@ export function HomePageClient() {
               savedPitch={savedPitch}
               savedVenue={savedRun?.venue}
               savedRunDate={savedRun?.savedAt}
+              sampleLoading={!sampleRunsLoaded}
               scrollRef={resultFeedRef}
             />
           </div>

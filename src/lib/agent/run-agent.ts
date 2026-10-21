@@ -7,10 +7,7 @@ import {
 } from "ai";
 import type { LineupRequest } from "@/lib/lineup/schemas";
 import { lineupRequestSchema } from "@/lib/lineup/schemas";
-import {
-  agentModelChain,
-  AGENT_TEMPERATURE,
-} from "./model";
+import { agentModelChain, AGENT_TEMPERATURE } from "./model";
 import { AgentBudget, AgentBudgetError } from "./budget";
 import {
   createEmptySession,
@@ -19,6 +16,7 @@ import {
   runWithAgentRuntime,
   type AgentRuntime,
 } from "./runtime";
+import { withQlooReceipts } from "@/lib/qloo/receipts";
 import { createStreamWriter } from "./stream-writer";
 import { buildAgentTools } from "./tools";
 import { regularsPhrases, runScoutSetup, scoutBrief } from "./scout-setup";
@@ -147,10 +145,7 @@ function streamAgentText(
 
 ${scoutBrief(runtime.session)}`,
     tools: buildAgentTools(),
-    stopWhen: [
-      stepCountIs(6),
-      () => Boolean(getAgentRuntime()?.session.pitch),
-    ],
+    stopWhen: [stepCountIs(6), () => Boolean(getAgentRuntime()?.session.pitch)],
     // One shared deadline across model rotations, so a fallback model can't
     // restart the 35s clock and push Quick mode past the 60s function limit.
     abortSignal: AbortSignal.timeout(
@@ -250,7 +245,9 @@ async function runLlmAgent(
         isGatewayRateLimitError(streamError) ||
         isGatewayRateLimitError(err)
       ) {
-        console.error("[agent] gateway rate limit — salvaging without rotation");
+        console.error(
+          "[agent] gateway rate limit — salvaging without rotation",
+        );
         return;
       }
       const lastModel = i === modelIds.length - 1;
@@ -305,44 +302,49 @@ export function createAgentResponse(body: unknown): Response {
         why: "Plan locked before tool calls.",
       });
 
-      try {
-        await runWithAgentRuntime(runtime, async () => {
-          if (!hasGateway()) {
-            throw new Error("AI Gateway not configured");
-          }
-          await runScoutSetup(buildAgentTools(), input);
-          try {
-            await runLlmAgent(input, runtime, (s) =>
-              writer.merge(s as never),
-            );
-          } catch (err) {
-            if (err instanceof AgentBudgetError) {
-              console.error("[agent] budget stop", err.kind, err.message);
-            } else {
-              console.error("[agent] llm run failed", err);
+      // Every Qloo request in this run, agent or Quick mode, for the receipts view.
+      const { receipts } = await withQlooReceipts(async () => {
+        try {
+          await runWithAgentRuntime(runtime, async () => {
+            if (!hasGateway()) {
+              throw new Error("AI Gateway not configured");
             }
+            await runScoutSetup(buildAgentTools(), input);
+            try {
+              await runLlmAgent(input, runtime, (s) =>
+                writer.merge(s as never),
+              );
+            } catch (err) {
+              if (err instanceof AgentBudgetError) {
+                console.error("[agent] budget stop", err.kind, err.message);
+              } else {
+                console.error("[agent] llm run failed", err);
+              }
+            }
+            await finishAgentRun(input, runtime, sw);
+          });
+          if (!runtime.session.pitch) {
+            await finishAgentRun(input, runtime, sw);
           }
-          await finishAgentRun(input, runtime, sw);
-        });
-        if (!runtime.session.pitch) {
-          await finishAgentRun(input, runtime, sw);
+        } catch (err) {
+          console.error("[agent] fatal", err);
+          await runOutsideAgentRuntime(async () => {
+            runtime.session.pitch = await runQuickMode(
+              input,
+              sw,
+              budget.startedAt,
+              budget.qlooCalls,
+              runtime.session,
+            );
+          });
         }
-      } catch (err) {
-        console.error("[agent] fatal", err);
-        await runOutsideAgentRuntime(async () => {
-          runtime.session.pitch = await runQuickMode(
-            input,
-            sw,
-            budget.startedAt,
-            budget.qlooCalls,
-            runtime.session,
-          );
-        });
-      }
+      });
 
       if (!runtime.session.pitch) {
         throw new Error("Agent finished without pitch");
       }
+      runtime.session.pitch = { ...runtime.session.pitch, qlooCalls: receipts };
+      sw.writePitch(runtime.session.pitch);
 
       const pin = runtime.session.pin;
       const validation = validatePitchPayload(runtime.session.pitch, [
