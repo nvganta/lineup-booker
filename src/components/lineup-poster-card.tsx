@@ -572,6 +572,7 @@ export function LineupPosterCard({
             <MarketingView
               state={insightsState}
               pitch={pitch}
+              venue={venue}
               cityLabel={insightsInput?.cityLabel ?? venueCity ?? ""}
               street={street}
               leadWith={leadWith}
