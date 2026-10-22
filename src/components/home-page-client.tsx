@@ -5,6 +5,7 @@ import { HowItWorksDialog } from "@/components/how-it-works-dialog";
 import { LandingHero } from "@/components/landing-hero";
 import { LineupForm } from "@/components/lineup-form";
 import { LineupResultPane } from "@/components/lineup-result-pane";
+import { VenueSummary } from "@/components/venue-summary";
 import {
   RecentRailDesktop,
   RecentRailMobile,
@@ -67,6 +68,9 @@ export function HomePageClient() {
   const [savedRun, setSavedRun] = useState<SampleRun | null>(null);
   const [savedPitch, setSavedPitch] = useState<PitchPayload | null>(null);
   const [howOpen, setHowOpen] = useState(false);
+  // The left column plays the request back once a lineup is up; Edit details reopens the form.
+  const [editing, setEditing] = useState(false);
+  const [audience, setAudience] = useState<string | null>(null);
   const resultFeedRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -97,6 +101,8 @@ export function HomePageClient() {
 
   function selectRequest(request: LineupRequest) {
     const run = sampleRunFor(request, sampleRuns);
+    setEditing(false);
+    setAudience(null);
     setForm(request);
     setAddressError(null);
     setSavedRun(run);
@@ -106,6 +112,8 @@ export function HomePageClient() {
   }
 
   function openStored(item: StoredLineup) {
+    setEditing(false);
+    setAudience(null);
     setForm(item.request);
     setSavedRun(null);
     setSavedPitch(item.pitch);
@@ -115,6 +123,8 @@ export function HomePageClient() {
   }
 
   function handleNewLineup() {
+    setEditing(false);
+    setAudience(null);
     setForm(EMPTY_REQUEST);
     setSavedRun(null);
     setSavedPitch(null);
@@ -139,6 +149,7 @@ export function HomePageClient() {
   }
 
   async function handleSubmit(data: LineupRequest) {
+    setAudience(null);
     setLoading(true);
     setError(null);
     setAddressError(null);
@@ -194,7 +205,9 @@ export function HomePageClient() {
   }
 
   // The landing is the front door; the shell appears once there is a run to show.
-  const showLanding = !loading && !savedPitch && !agentState?.pitch && !error;
+  const shownPitch = savedPitch ?? agentState?.pitch ?? null;
+  const showLanding = !loading && !shownPitch && !error;
+  const showSummary = Boolean(shownPitch) && !loading && !editing;
 
   const railProps = {
     stored: storedLineups,
@@ -244,34 +257,46 @@ export function HomePageClient() {
 
               <div className="flex flex-col lg:flex-row flex-1 min-h-0 max-lg:overflow-visible">
                 <div className="shrink-0 w-full lg:w-[20rem] xl:w-[22rem] lg:border-r border-[#e8dfd6] bg-[#faf7f2]/95 lg:overflow-hidden px-4 py-5 lg:px-5">
-                  <LineupForm
-                    value={form}
-                    onChange={setForm}
-                    onSubmit={handleSubmit}
-                    loading={loading}
-                    addressError={addressError}
-                  />
+                  {showSummary ? (
+                    <VenueSummary
+                      request={form}
+                      audience={audience}
+                      onEdit={() => setEditing(true)}
+                      disabled={loading}
+                    />
+                  ) : (
+                    <LineupForm
+                      value={form}
+                      onChange={setForm}
+                      onSubmit={(data) => {
+                        setEditing(false);
+                        void handleSubmit(data);
+                      }}
+                      loading={loading}
+                      addressError={addressError}
+                    />
+                  )}
                   <div className="mt-6 pt-4 border-t border-[#e8dfd6]">
-                      <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8a7f76] mb-2">
-                        Examples
-                      </p>
-                      <ul className="list-none space-y-1">
-                        {EXAMPLE_VENUES.map((ex) => (
-                          <li key={ex.label}>
-                            <button
-                              type="button"
-                              disabled={loading}
-                              onClick={() => selectRequest(ex.request)}
-                              className={cn(
-                                "text-sm text-[#6b5c52] hover:text-[#8c4a32] disabled:opacity-50 transition-colors",
-                              )}
-                            >
-                              {ex.label}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8a7f76] mb-2">
+                      Examples
+                    </p>
+                    <ul className="list-none space-y-1">
+                      {EXAMPLE_VENUES.map((ex) => (
+                        <li key={ex.label}>
+                          <button
+                            type="button"
+                            disabled={loading}
+                            onClick={() => selectRequest(ex.request)}
+                            className={cn(
+                              "text-sm text-[#6b5c52] hover:text-[#8c4a32] disabled:opacity-50 transition-colors",
+                            )}
+                          >
+                            {ex.label}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
 
                 <LineupResultPane
@@ -281,6 +306,7 @@ export function HomePageClient() {
                   form={form}
                   savedPitch={savedPitch}
                   savedVenue={savedRun?.venue}
+                  onAudience={setAudience}
                   scrollRef={resultFeedRef}
                 />
               </div>

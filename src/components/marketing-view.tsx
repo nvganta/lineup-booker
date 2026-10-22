@@ -15,7 +15,6 @@ import {
   POSTER_ARTICLE_CLASS,
   SectionLabel,
   SourceNote,
-  TabHeader,
   TabLoading,
   TabSection,
 } from "@/components/venue-tab-parts";
@@ -40,6 +39,8 @@ type Props = {
   cityLabel: string;
   street: string;
   leadWith: string[];
+  /** The owner's date line, if they gave one; seeds the poster. */
+  defaultWhen?: string;
 };
 
 function CopyButton({ text }: { text: string }) {
@@ -63,8 +64,8 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-export function MarketingView({ state, pitch, venue, cityLabel, street, leadWith }: Props) {
-  const [when, setWhen] = useState("");
+export function MarketingView({ state, pitch, venue, cityLabel, street, leadWith, defaultWhen }: Props) {
+  const [when, setWhen] = useState(defaultWhen ?? "");
   const posterRef = useRef<HTMLDivElement>(null);
 
   const handleDownload = useCallback(async () => {
@@ -107,8 +108,6 @@ export function MarketingView({ state, pitch, venue, cityLabel, street, leadWith
 
   return (
     <article className={cn(POSTER_ARTICLE_CLASS, "max-w-none")} data-tab-panel="marketing">
-      <TabHeader title={`Where to reach ${pitch.headliner.name} fans`} />
-
       <TabSection>
         <SectionLabel>Where the fans live</SectionLabel>
         {hoods.length > 0 ? (

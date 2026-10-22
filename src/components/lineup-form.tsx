@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { LineupRequest } from "@/lib/lineup/schemas";
-import { MapPin, Music2, UtensilsCrossed } from "lucide-react";
+import { CalendarDays, MapPin, Music2, UtensilsCrossed } from "lucide-react";
 import type { ReactNode } from "react";
 
 type Props = {
@@ -113,6 +113,25 @@ export function LineupForm({
               placeholder="Indie folk, vinyl nights"
               className="min-h-[4.5rem] pl-10 text-base bg-[#fcf9f5] border-[#e8dfd6] rounded-lg resize-none py-2.5"
               required
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="when" className="text-sm text-[#1a1614]">
+            Date <span className="text-[#8a7f76] font-normal">(optional)</span>
+          </Label>
+          <div className="relative">
+            <FieldIcon>
+              <CalendarDays className="size-4" strokeWidth={1.75} />
+            </FieldIcon>
+            <Input
+              id="when"
+              value={value.when ?? ""}
+              onChange={(e) => onChange({ ...value, when: e.target.value })}
+              placeholder="Sat 8 Nov · 8 PM"
+              maxLength={60}
+              className="h-11 pl-10 text-base bg-[#fcf9f5] border-[#e8dfd6] rounded-lg"
             />
           </div>
         </div>

@@ -9,7 +9,6 @@ import {
   POSTER_ARTICLE_CLASS,
   SectionLabel,
   SourceNote,
-  TabHeader,
   TabLoading,
   TabSection,
 } from "@/components/venue-tab-parts";
@@ -87,11 +86,9 @@ export function FoodDealsView({ state, headlinerName, cityLabel }: Props) {
   if (state.status === "idle" || state.status === "loading") {
     return <TabLoading label="Reading Qloo place data…" />;
   }
-  const title = "What to put on special";
   if (state.status === "error") {
     return (
       <article className={cn(POSTER_ARTICLE_CLASS, "max-w-none")}>
-        <TabHeader title={title} />
         <TabSection last>
           <Muted>Qloo place data didn&apos;t load, so nothing is shown.</Muted>
         </TabSection>
@@ -115,13 +112,9 @@ export function FoodDealsView({ state, headlinerName, cityLabel }: Props) {
 
   return (
     <article className={cn(POSTER_ARTICLE_CLASS, "max-w-none")} data-tab-panel="food">
-      <TabHeader title={title} />
-
       <TabSection>
         <SectionLabel>
-          <span className="mr-auto">
-            Where {headlinerName} fans eat and drink, against {city}
-          </span>
+          <span className="mr-auto">Put these on special</span>
           {copy && top.some((t) => t.idea) && <DraftedBadge source={copy.source} />}
         </SectionLabel>
         {food.status === "ok" && top.length > 0 ? (
