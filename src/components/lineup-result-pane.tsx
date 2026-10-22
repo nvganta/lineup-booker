@@ -2,7 +2,6 @@
 
 import { AgentScoutStream } from "@/components/agent-scout-stream";
 import { AgentStreamingPoster } from "@/components/agent-streaming-poster";
-import { FirstRunPanel, type ExampleRoom } from "@/components/first-run-panel";
 import { LineupPosterCard } from "@/components/lineup-poster-card";
 import type { AgentStreamState } from "@/lib/agent/consume-agent-stream";
 import type { PitchPayload } from "@/lib/agent/types";
@@ -23,8 +22,6 @@ type Props = {
   savedPitch: PitchPayload | null;
   /** Set when the saved pitch is a stored example run, not one scouted just now. */
   savedVenue?: { lat: number; lon: number };
-  examples: ExampleRoom[];
-  onSelectExample: (request: LineupRequest) => void;
   className?: string;
   scrollRef?: React.RefObject<HTMLElement | null>;
 };
@@ -36,13 +33,10 @@ export function LineupResultPane({
   form,
   savedPitch,
   savedVenue,
-  examples,
-  onSelectExample,
   className,
   scrollRef,
 }: Props) {
   const pitch = savedPitch ?? agentState?.pitch;
-  const showFirstRun = !loading && !pitch && !error;
 
   return (
     <section
@@ -108,14 +102,6 @@ export function LineupResultPane({
             animateSettle
           />
         </div>
-      )}
-
-      {showFirstRun && (
-        <FirstRunPanel
-          examples={examples}
-          onSelect={onSelectExample}
-          disabled={loading}
-        />
       )}
     </section>
   );

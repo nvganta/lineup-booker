@@ -1,8 +1,8 @@
 "use client";
 
 import { AppShellTopBar } from "@/components/app-shell-top-bar";
-import type { ExampleRoom } from "@/components/first-run-panel";
 import { HowItWorksDialog } from "@/components/how-it-works-dialog";
+import { LandingHero } from "@/components/landing-hero";
 import { LineupForm } from "@/components/lineup-form";
 import { LineupResultPane } from "@/components/lineup-result-pane";
 import {
@@ -193,11 +193,8 @@ export function HomePageClient() {
     }
   }
 
-  const examples: ExampleRoom[] = EXAMPLE_VENUES.map((venue) => ({
-    venue,
-    run: sampleRuns[venue.request.location] ?? null,
-  }));
-  const hasResult = loading || Boolean(savedPitch) || Boolean(agentState);
+  // The landing is the front door; the shell appears once there is a run to show.
+  const showLanding = !loading && !savedPitch && !agentState?.pitch && !error;
 
   const railProps = {
     stored: storedLineups,
@@ -225,58 +222,71 @@ export function HomePageClient() {
           onNewLineup={handleNewLineup}
         />
         <HowItWorksDialog open={howOpen} onClose={() => setHowOpen(false)} />
-        <RecentRailMobile {...railProps} />
 
-        <div className="relative z-10 flex flex-col lg:flex-row flex-1 min-h-0 max-lg:overflow-visible">
-          <RecentRailDesktop {...railProps} />
-
-          <div className="flex flex-col lg:flex-row flex-1 min-h-0 max-lg:overflow-visible">
-            <div className="shrink-0 w-full lg:w-[20rem] xl:w-[22rem] lg:border-r border-[#e8dfd6] bg-[#faf7f2]/95 lg:overflow-hidden px-4 py-5 lg:px-5">
-              <LineupForm
-                value={form}
-                onChange={setForm}
-                onSubmit={handleSubmit}
-                loading={loading}
-                addressError={addressError}
-              />
-              {hasResult && (
-                <div className="mt-6 pt-4 border-t border-[#e8dfd6]">
-                  <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8a7f76] mb-2">
-                    Examples
-                  </p>
-                  <ul className="list-none space-y-1">
-                    {EXAMPLE_VENUES.map((ex) => (
-                      <li key={ex.label}>
-                        <button
-                          type="button"
-                          disabled={loading}
-                          onClick={() => selectRequest(ex.request)}
-                          className={cn(
-                            "text-sm text-[#6b5c52] hover:text-[#8c4a32] disabled:opacity-50 transition-colors",
-                          )}
-                        >
-                          {ex.label}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-
-            <LineupResultPane
-              loading={loading}
-              error={error}
-              agentState={agentState}
-              form={form}
-              savedPitch={savedPitch}
-              savedVenue={savedRun?.venue}
-              examples={examples}
+        {showLanding ? (
+          <div className="relative z-10 flex flex-col flex-1 min-h-0">
+            <LandingHero
+              examples={EXAMPLE_VENUES}
+              onSubmit={(data) => {
+                setForm(data);
+                void handleSubmit(data);
+              }}
               onSelectExample={selectRequest}
-              scrollRef={resultFeedRef}
+              loading={loading}
             />
           </div>
-        </div>
+        ) : (
+          <>
+            <RecentRailMobile {...railProps} />
+
+            <div className="relative z-10 flex flex-col lg:flex-row flex-1 min-h-0 max-lg:overflow-visible">
+              <RecentRailDesktop {...railProps} />
+
+              <div className="flex flex-col lg:flex-row flex-1 min-h-0 max-lg:overflow-visible">
+                <div className="shrink-0 w-full lg:w-[20rem] xl:w-[22rem] lg:border-r border-[#e8dfd6] bg-[#faf7f2]/95 lg:overflow-hidden px-4 py-5 lg:px-5">
+                  <LineupForm
+                    value={form}
+                    onChange={setForm}
+                    onSubmit={handleSubmit}
+                    loading={loading}
+                    addressError={addressError}
+                  />
+                  <div className="mt-6 pt-4 border-t border-[#e8dfd6]">
+                      <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8a7f76] mb-2">
+                        Examples
+                      </p>
+                      <ul className="list-none space-y-1">
+                        {EXAMPLE_VENUES.map((ex) => (
+                          <li key={ex.label}>
+                            <button
+                              type="button"
+                              disabled={loading}
+                              onClick={() => selectRequest(ex.request)}
+                              className={cn(
+                                "text-sm text-[#6b5c52] hover:text-[#8c4a32] disabled:opacity-50 transition-colors",
+                              )}
+                            >
+                              {ex.label}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                </div>
+
+                <LineupResultPane
+                  loading={loading}
+                  error={error}
+                  agentState={agentState}
+                  form={form}
+                  savedPitch={savedPitch}
+                  savedVenue={savedRun?.venue}
+                  scrollRef={resultFeedRef}
+                />
+              </div>
+            </div>
+          </>
+        )}
       </main>
     </MotionConfig>
   );
