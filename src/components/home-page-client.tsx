@@ -242,7 +242,7 @@ export function HomePageClient() {
               {hasResult && (
                 <div className="mt-6 pt-4 border-t border-[#e8dfd6]">
                   <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8a7f76] mb-2">
-                    Try a room
+                    Examples
                   </p>
                   <ul className="list-none space-y-1">
                     {EXAMPLE_VENUES.map((ex) => (

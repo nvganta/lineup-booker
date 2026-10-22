@@ -28,20 +28,18 @@ export function FirstRunPanel({ examples, onSelect, disabled }: Props) {
   return (
     <motion.div {...fadeUp} className={cn(FEED_BLOCK_CLASS, "space-y-6")} data-first-run>
       <header className="max-w-2xl">
-        <h2 className="font-heading text-[26px] leading-[1.12] text-[#1a1614] text-balance">
-          Tell us about your bar. We&apos;ll tell you who to book, who&apos;ll
-          come, what they&apos;ll order, and where to find them.
+        <h2 className="font-heading text-[30px] leading-[1.1] text-[#1a1614]">
+          Tell us about your place.
         </h2>
-        <p className="mt-2 text-sm text-[#6b5c52] max-w-xl">
-          Independent rooms book on gut and group chats. A wrong night costs a
-          week of bar revenue. This scout books from what your crowd actually
-          loves, using Qloo&apos;s taste data instead of a guess.
+        <p className="mt-1.5 text-[15px] leading-snug text-[#6b5c52] text-balance">
+          We&apos;ll tell you who to book, who&apos;ll come, what they&apos;ll
+          order, and where to find them.
         </p>
       </header>
 
       <section>
         <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8c4a32] mb-2.5">
-          Try a room
+          See an example
         </p>
         <ul className="grid grid-cols-1 sm:grid-cols-3 gap-3 list-none">
           {examples.map(({ venue, run }) => (
