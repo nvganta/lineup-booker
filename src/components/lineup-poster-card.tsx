@@ -1,8 +1,6 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { AnimatePresence, animate, motion } from "motion/react";
-import { toPng } from "html-to-image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PitchPayload } from "@/lib/agent/types";
 import { ArtistPhoto } from "@/components/artist-photo";
@@ -24,8 +22,14 @@ import {
 } from "@/hooks/use-pitch-analytics";
 import { slugifyFilename } from "@/lib/copy/slugify";
 import { openerOriginMatchesForAct } from "@/lib/lineup/opener-origin-meta";
-import { withPosterExportImageCacheBust } from "@/lib/poster-export-images";
-import { formatCrowdDisplay } from "@/lib/lineup/crowd-display";
+import {
+  crowdGenderLean,
+  crowdTopPositiveAgeRow,
+  formatCrowdDisplay,
+} from "@/lib/lineup/crowd-display";
+import { formatSkewIndex } from "@/lib/lineup/crowd-skew-display";
+import { drawLine } from "@/lib/lineup/draw-line";
+import { popularityBandFromConcept } from "@/lib/lineup/tiers";
 import {
   posterRunWhyKey,
   whyCacheForPosterRun,
@@ -38,22 +42,11 @@ import { BookItView } from "@/components/book-it-view";
 import { ENTER, fadeUp } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
-const LineupMap = dynamic(
-  () => import("@/components/lineup-map").then((m) => m.LineupMap),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="h-[120px] rounded-md border border-[#e8dfd6] bg-[#f3ece4]" />
-    ),
-  },
-);
-
 type Props = {
   pitch: PitchPayload;
   venue?: { lat: number; lon: number };
   className?: string;
   wideFeed?: boolean;
-  previewBadge?: "saved-run" | null;
   animateSettle?: boolean;
 };
 
@@ -68,12 +61,42 @@ function cityHintFromAddress(address: string): string | undefined {
   return parts[parts.length - 2];
 }
 
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#6b5c52] mb-2">
+      {children}
+    </p>
+  );
+}
+
+/** Where the act sits on Qloo's reach scale, as a bar with the tier in words. */
+function DrawMeter({ popularity, capacity }: { popularity?: number; capacity?: number }) {
+  const draw = drawLine(popularity, capacity);
+  if (!draw) return null;
+  return (
+    <div className="mt-3" data-draw-line>
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-[13px] font-medium text-[#1a1614]">{draw.label}</p>
+        <span className="text-[11px] tabular-nums text-[#8a7f76]">
+          {draw.percentile}/100 reach
+        </span>
+      </div>
+      <div className="relative mt-1.5 h-1.5 rounded-full bg-[#e8dfd6]" aria-hidden>
+        <div
+          className="absolute inset-y-0 left-0 rounded-full bg-[#8c4a32]"
+          style={{ width: `${draw.percentile}%` }}
+        />
+      </div>
+      <p className="mt-1.5 text-[12px] leading-snug text-[#5c534d]">{draw.line}</p>
+    </div>
+  );
+}
+
 export function LineupPosterCard({
   pitch: initialPitch,
   venue,
   className,
   wideFeed,
-  previewBadge,
   animateSettle,
 }: Props) {
   const [pitch, setPitch] = useState(initialPitch);
@@ -96,59 +119,46 @@ export function LineupPosterCard({
     analyticsState.status === "ready" ? analyticsState.data : null;
 
   const whyByActId = whyCacheForPosterRun(posterRunWhyKey(pitch), analytics);
+  const whyFor = useCallback(
+    (id: string) =>
+      whyLineForAct(whyByActId, id) ??
+      analytics?.acts.find((a) => a.id === id)?.whyLine ??
+      null,
+    [whyByActId, analytics],
+  );
 
   const venueCity =
     pitch.meta?.cityLabel?.trim() || cityHintFromAddress(pitch.address);
-  const headlinerWhyLine =
-    whyLineForAct(whyByActId, pitch.headliner.id) ??
-    analytics?.acts.find((a) => a.id === pitch.headliner.id)?.whyLine ??
-    null;
-  const openerReachLine = pitch.opener
-    ? (whyLineForAct(whyByActId, pitch.opener.id) ??
-      analytics?.acts.find((a) => a.id === pitch.opener!.id)?.whyLine ??
-      null)
-    : null;
+  const headlinerWhyLine = whyFor(pitch.headliner.id);
+  const openerReachLine = pitch.opener ? whyFor(pitch.opener.id) : null;
+  const capacity = popularityBandFromConcept(
+    pitch.meta?.concept?.trim() || pitch.venueLabel,
+  ).seatCapacity;
 
-  const swapNext = pitch.openerSwapQueue?.[0];
-
-  const handleSwap = useCallback(() => {
-    if (!swapNext || !pitch.opener) return;
-    setAnalyticsRev((n) => n + 1);
-    setPitch((p) => applyOpenerSwap({ pitch: p, swapNext }));
-  }, [pitch.opener, swapNext]);
-
-  const handleDownload = useCallback(async () => {
-    if (!cardRef.current) return;
-    try {
-      let dataUrl = "";
-      await withPosterExportImageCacheBust(cardRef.current, async () => {
-        dataUrl = await toPng(cardRef.current!, {
-          cacheBust: true,
-          includeQueryParams: true,
-          pixelRatio: 2,
-          backgroundColor: "#f7f2eb",
-          fetchRequestInit: { cache: "no-store" },
-          filter: (node) =>
-            !(node instanceof HTMLElement && node.dataset.posterExclude),
-        });
-      });
-      const a = document.createElement("a");
-      a.href = dataUrl;
-      a.download = `${slugifyFilename(pitch.venueLabel)}-lineup.png`;
-      a.click();
-    } catch {
-      /* ignore */
-    }
-  }, [pitch.venueLabel]);
+  const handleSwap = useCallback(
+    (swapNext: NonNullable<PitchPayload["openerSwapQueue"]>[number]) => {
+      if (!pitch.opener) return;
+      setAnalyticsRev((n) => n + 1);
+      setPitch((p) => applyOpenerSwap({ pitch: p, swapNext }));
+    },
+    [pitch.opener],
+  );
 
   const showLocalBadge =
     openerOriginMatchesForAct(pitch, pitch.opener?.id) ||
     analytics?.openerShowLocalBadge === true;
 
+  const demographics = analytics?.demographics ?? pitch.crowdDemographics ?? null;
   const crowdLine =
-    analytics?.crowdLine?.trim() ||
-    formatCrowdDisplay(pitch.crowdDemographics) ||
-    null;
+    analytics?.crowdLine?.trim() || formatCrowdDisplay(demographics) || null;
+  const topAge = crowdTopPositiveAgeRow(demographics);
+  const genderLean = crowdGenderLean(demographics?.gender ?? null);
+  const genderValue =
+    genderLean === "female"
+      ? demographics?.gender?.female
+      : genderLean === "male"
+        ? demographics?.gender?.male
+        : undefined;
 
   const street = pitch.address.split(",")[0]?.trim() ?? "";
   const styleTags = useMemo(
@@ -273,8 +283,8 @@ export function LineupPosterCard({
     setVenueTabsOpened(true);
   }, []);
 
-  // The lineup panel stays mounted (map, poster export) and is only hidden, so
-  // coming back to it replays the same fade the other panels get on mount.
+  // The lineup panel stays mounted and is only hidden, so coming back to it
+  // replays the same fade the other panels get on mount.
   const lineupVisible = tab === "lineup" && !compare && !booking;
   const lineupShownOnce = useRef(lineupVisible);
   useEffect(() => {
@@ -291,35 +301,15 @@ export function LineupPosterCard({
     if (t === "food" || t === "marketing") setVenueTabsOpened(true);
   }, []);
 
+  const qlooCallCount =
+    (pitch.qlooCalls?.length ?? 0) + (analytics?.qlooCalls?.length ?? 0);
+  const otherOpeners = (pitch.openerSwapQueue ?? []).slice(0, 3);
+  const alternates = pitch.alternates.slice(0, 4);
+
   const articleClass = cn(
     "relative mx-auto w-full max-w-xl rounded-sm border border-[#e8dfd6] bg-[#f7f2eb] text-[#1a1614]",
     "shadow-[0_1px_0_rgba(26,22,20,0.06),0_20px_40px_-24px_rgba(26,22,20,0.22)]",
     wideFeed && "max-w-none",
-    "ui-poster-compact",
-  );
-
-  const posterHeader = (
-    <header className="px-5 pt-3 pb-1.5 flex items-start justify-between gap-3 border-b border-[#e0d5ca]">
-      <div className="min-w-0">
-        <p className="text-[10px] uppercase tracking-[0.28em] text-[#8c4a32]">
-          One night
-        </p>
-        <p className="font-heading text-lg leading-tight mt-0.5 truncate">
-          {pitch.venueLabel}
-        </p>
-        <p className="text-xs text-[#6b5c52] mt-0.5 truncate">
-          {pitch.address}
-        </p>
-      </div>
-      {previewBadge === "saved-run" && (
-        <Badge
-          variant="outline"
-          className="shrink-0 rounded-full border-[#d4c4b5] text-[#6b5c52] text-[10px] uppercase tracking-wider bg-[#fcf9f5]"
-        >
-          Saved run
-        </Badge>
-      )}
-    </header>
   );
 
   return (
@@ -338,11 +328,31 @@ export function LineupPosterCard({
       >
         <div
           ref={cardRef}
-          className={cn("space-y-3", !lineupVisible && "hidden")}
+          className={cn(!lineupVisible && "hidden")}
           data-tab-panel="lineup"
         >
           <article className={articleClass}>
-            {posterHeader}
+            <header className="px-5 pt-3.5 pb-3 flex items-start justify-between gap-3 border-b border-[#e0d5ca]">
+              <div className="min-w-0">
+                <p className="font-heading text-lg leading-tight truncate">
+                  {pitch.venueLabel}
+                </p>
+                <p className="text-xs text-[#6b5c52] mt-0.5 truncate">
+                  {pitch.address}
+                </p>
+              </div>
+              {qlooCallCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => handleTab("data")}
+                  className="shrink-0 rounded-full border border-[#e0d5ca] bg-[#fcf9f5] px-2.5 py-1 text-[11px] text-[#6b5c52] hover:text-[#8c4a32] hover:border-[#8c4a32]/40 transition-colors cursor-pointer"
+                  data-qloo-count
+                >
+                  {qlooCallCount} Qloo lookups
+                </button>
+              )}
+            </header>
+
             <HeadlinerHero
               artist={{
                 id: pitch.headliner.id,
@@ -353,7 +363,12 @@ export function LineupPosterCard({
               noMatch={false}
               compact
               whyLine={headlinerWhyLine}
-            />
+            >
+              <DrawMeter
+                popularity={pitch.meta?.headlinerPopularity}
+                capacity={capacity}
+              />
+            </HeadlinerHero>
 
             <AnimatePresence mode="popLayout" initial={false}>
               {pitch.opener && (
@@ -363,120 +378,143 @@ export function LineupPosterCard({
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -12 }}
                   transition={ENTER}
-                  className="px-5 py-3 flex gap-3 items-center"
+                  className="px-5 py-4 border-b border-[#e8dfd6]"
                 >
-                  <ArtistPhoto
-                    name={pitch.opener.name}
-                    imageUrl={pitch.opener.imageUrl}
-                    rounded="full"
-                    className="h-12 w-12 text-base shrink-0"
-                  />
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-[10px] uppercase tracking-[0.22em] text-[#6b5c52]">
-                        Opener
+                  <div className="flex gap-3 items-start">
+                    <ArtistPhoto
+                      name={pitch.opener.name}
+                      imageUrl={pitch.opener.imageUrl}
+                      rounded="full"
+                      className="h-12 w-12 text-base shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#6b5c52]">
+                          Opener
+                        </p>
+                        {showLocalBadge && (
+                          <Badge className="rounded-full bg-[#8c4a32]/10 text-[#8c4a32] border-0 text-[10px] uppercase tracking-wide hover:bg-[#8c4a32]/10">
+                            Local
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="font-heading text-lg leading-tight">
+                        {pitch.opener.name}
                       </p>
-                      {showLocalBadge && (
-                        <Badge className="rounded-full bg-[#8c4a32]/10 text-[#8c4a32] border-0 text-[10px] uppercase tracking-wide hover:bg-[#8c4a32]/10">
-                          Local
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="font-heading text-lg leading-tight">
-                      {pitch.opener.name}
-                    </p>
-                    {openerReachLine && !pitch.openerWhy?.trim() && (
                       <p className="text-xs text-[#5c534d] mt-0.5">
-                        {openerReachLine}
+                        {pitch.openerWhy?.trim() || openerReachLine}
                       </p>
-                    )}
-                    {pitch.openerWhy?.trim() && (
-                      <p className="text-xs text-[#6b5c52] mt-0.5 italic">
-                        {pitch.openerWhy.trim()}
-                      </p>
-                    )}
+                    </div>
                   </div>
+                  {otherOpeners.length > 0 && (
+                    <div className="mt-3 pl-[60px]">
+                      <p className="text-[11px] text-[#8a7f76] mb-1.5">
+                        Or open with
+                      </p>
+                      <ul className="flex flex-wrap gap-1.5 list-none">
+                        {otherOpeners.map((o) => (
+                          <li key={o.id}>
+                            <button
+                              type="button"
+                              onClick={() => handleSwap(o)}
+                              title={o.reason}
+                              data-swap-opener={o.id}
+                              className="inline-flex items-center gap-1.5 rounded-full border border-[#e0d5ca] bg-[#fcf9f5] pl-1 pr-2.5 py-1 text-[12px] text-[#1a1614] hover:border-[#8c4a32]/40 hover:bg-[#f7f2eb] transition-colors cursor-pointer"
+                            >
+                              <ArtistPhoto
+                                name={o.name}
+                                imageUrl={o.imageUrl}
+                                rounded="full"
+                                className="h-5 w-5 text-[8px]"
+                              />
+                              {o.name}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </motion.section>
               )}
             </AnimatePresence>
-          </article>
 
-          <article className={articleClass}>
-            {crowdLine && (
-              <p className="px-5 py-2 text-sm text-[#5c534d] border-b border-[#e8dfd6]">
-                {crowdLine}
-              </p>
-            )}
-
-            {pitch.alternates.length > 0 && (
-              <section className="px-5 py-2 border-b border-[#e8dfd6] ui-poster-bench">
-                <p className="text-[10px] uppercase tracking-[0.22em] text-[#6b5c52] mb-2">
-                  Bench
-                </p>
-                <ul className="flex flex-wrap gap-3 list-none">
-                  {pitch.alternates.slice(0, 4).map((a) => (
-                    <li key={a.id} className="flex flex-col items-center w-14">
-                      <ArtistPhoto
-                        name={a.name}
-                        imageUrl={a.imageUrl}
-                        rounded="full"
-                        className="h-8 w-8 text-[10px]"
-                      />
-                      <span className="text-[10px] text-center line-clamp-2 mt-0.5">
-                        {a.name}
-                      </span>
-                    </li>
-                  ))}
+            {alternates.length > 0 && (
+              <section className="px-5 py-4 border-b border-[#e8dfd6]">
+                <SectionLabel>Also fits your room</SectionLabel>
+                <ul className="grid grid-cols-2 sm:grid-cols-4 gap-3 list-none">
+                  {alternates.map((a) => {
+                    const why = whyFor(a.id);
+                    return (
+                      <li
+                        key={a.id}
+                        className="flex gap-2.5 items-start min-w-0"
+                        title={why ?? undefined}
+                      >
+                        <ArtistPhoto
+                          name={a.name}
+                          imageUrl={a.imageUrl}
+                          rounded="full"
+                          className="h-9 w-9 text-[11px] shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-medium leading-tight text-[#1a1614] line-clamp-2">
+                            {a.name}
+                          </p>
+                          {why && (
+                            <p className="text-[11px] leading-snug text-[#8a7f76] mt-0.5 line-clamp-2">
+                              {why}
+                            </p>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               </section>
             )}
 
-            {pitch.neighborhoods.length > 0 && (
-              <section className="px-5 py-3 space-y-2 ui-poster-map clear-both">
-                {venue && tab === "lineup" && (
-                  <LineupMap
-                    lineup={{
-                      venue: { ...venue, city: "Venue" },
-                      neighborhoods: pitch.neighborhoods,
-                    }}
-                    className="h-[132px] lg:h-[132px] relative z-0"
-                  />
-                )}
-                <ol className="ui-poster-map-legend grid grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-0.5 list-none text-xs">
-                  {pitch.neighborhoods.map((n) => (
-                    <li key={n.rank} className="flex gap-1.5">
-                      <span className="text-[#8c4a32]">#{n.rank}</span>
-                      <span className="font-heading truncate">
-                        {stripCityFromNeighborhoodLabel(n.name, venueCity)}
+            {(topAge || genderLean) && (
+              <section className="px-5 py-4 border-b border-[#e8dfd6]" data-crowd>
+                <SectionLabel>Who&apos;ll come</SectionLabel>
+                <div className="flex flex-wrap gap-2">
+                  {topAge && (
+                    <span
+                      className="inline-flex items-baseline gap-1.5 rounded-full border border-[#e0d5ca] bg-[#fcf9f5] px-3 py-1.5 text-[13px] text-[#1a1614]"
+                      title={`Qloo skew ${formatSkewIndex(topAge.value)} for ages ${topAge.label}`}
+                    >
+                      Ages {topAge.label}
+                      <span className="text-[11px] tabular-nums text-[#8c4a32]">
+                        {formatSkewIndex(topAge.value)}
                       </span>
-                    </li>
-                  ))}
-                </ol>
+                    </span>
+                  )}
+                  {genderLean && (
+                    <span
+                      className="inline-flex items-baseline gap-1.5 rounded-full border border-[#e0d5ca] bg-[#fcf9f5] px-3 py-1.5 text-[13px] text-[#1a1614]"
+                      title={
+                        genderValue != null
+                          ? `Qloo skew ${formatSkewIndex(genderValue)} ${genderLean}`
+                          : undefined
+                      }
+                    >
+                      Leans {genderLean}
+                      {genderValue != null && (
+                        <span className="text-[11px] tabular-nums text-[#8c4a32]">
+                          {formatSkewIndex(genderValue)}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-2 text-[11px] text-[#8a7f76]">
+                  Qloo audience skew for {pitch.headliner.name} fans
+                  {venueCity ? ` in ${venueCity}` : ""}. Positive means more than
+                  the city average.
+                </p>
               </section>
             )}
 
-            <div
-              data-poster-exclude="true"
-              className="flex flex-wrap gap-3 px-5 pt-3 pb-3.5 border-t border-[#e8dfd6]"
-            >
-              {swapNext && pitch.opener && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="rounded-full border-[#e0d5ca] text-sm"
-                  onClick={handleSwap}
-                >
-                  Swap opener — {swapNext.name}
-                </Button>
-              )}
-              <Button
-                type="button"
-                variant="outline"
-                className="rounded-full border-[#e0d5ca] text-sm"
-                onClick={handleDownload}
-              >
-                Download poster
-              </Button>
+            <div className="flex flex-wrap items-center gap-3 px-5 py-3.5">
               <Button
                 type="button"
                 className="rounded-full bg-[#8c4a32] hover:bg-[#7a3f2a] text-white text-sm"
@@ -485,6 +523,9 @@ export function LineupPosterCard({
               >
                 Book it
               </Button>
+              <p className="text-[12px] text-[#8a7f76]">
+                Drafts the booking email and a one-page brief.
+              </p>
             </div>
           </article>
         </div>

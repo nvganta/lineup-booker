@@ -16,6 +16,7 @@ export function HeadlinerHero({
   noMatch,
   compact,
   whyLine,
+  children,
 }: {
   artist: Artist;
   noMatch: boolean;
@@ -23,6 +24,8 @@ export function HeadlinerHero({
   compact?: boolean;
   /** Headliner why line (poster / agent card). */
   whyLine?: string | null;
+  /** Rendered under the why line (the draw line and meter). */
+  children?: React.ReactNode;
 }) {
   const upgradedUrl = upgradeQlooArtistImageUrl(artist.imageUrl);
   const [useFallbackSize, setUseFallbackSize] = useState(false);
@@ -112,6 +115,7 @@ export function HeadlinerHero({
       {noMatch && artist.detail && (
         <p className="text-sm text-[#5c534d] mt-2 leading-snug">{artist.detail}</p>
       )}
+      {children}
     </div>
   );
 

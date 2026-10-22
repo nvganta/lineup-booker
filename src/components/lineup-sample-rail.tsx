@@ -1,157 +1,104 @@
 "use client";
 
 import { ArtistPhoto } from "@/components/artist-photo";
-import type { ExampleVenue } from "@/lib/example-venues";
 import type { StoredLineup } from "@/lib/stored-lineups";
-import type { LineupRequest } from "@/lib/lineup/schemas";
-import { INDICATOR } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { Star } from "lucide-react";
-import { motion } from "motion/react";
 
 type Props = {
-  samples: ExampleVenue[];
   stored: StoredLineup[];
-  activeRequest: LineupRequest;
-  onSelectRequest: (request: LineupRequest) => void;
   onOpenStored: (item: StoredLineup) => void;
   onTogglePin: (id: string) => void;
   disabled?: boolean;
 };
 
-function isActive(a: LineupRequest, b: LineupRequest): boolean {
-  return (
-    a.location === b.location &&
-    a.concept === b.concept &&
-    a.regularsLove === b.regularsLove
-  );
-}
-
-function RailButton({
-  label,
-  sub,
-  active,
+function RecentRow({
+  item,
   disabled,
-  onClick,
-  leading,
-  trailing,
-  className,
+  onOpen,
+  onTogglePin,
 }: {
-  label: string;
-  sub?: string;
-  active: boolean;
+  item: StoredLineup;
   disabled?: boolean;
-  onClick: () => void;
-  leading?: React.ReactNode;
-  trailing?: React.ReactNode;
-  className?: string;
+  onOpen: () => void;
+  onTogglePin: () => void;
 }) {
-  // The trailing control (pin) sits beside the row button, not inside it:
+  // The pin sits beside the row button, not inside it:
   // a button inside a button is invalid HTML and breaks hydration.
   return (
     <div className="relative">
       <button
         type="button"
         disabled={disabled}
-        onClick={onClick}
+        onClick={onOpen}
         className={cn(
-          "relative w-full text-left rounded-md px-3 py-2.5 text-sm flex gap-2.5 items-start",
-          trailing && "pr-9",
-          "transition-[color,background-color,transform] duration-200 ease-out active:scale-[0.98] disabled:opacity-50",
-          active ? "text-[#1a1614]" : "text-[#5c534d] hover:bg-[#faf7f2]",
-          className,
+          "relative w-full text-left rounded-md px-3 py-2.5 pr-9 text-sm flex gap-2.5 items-start text-[#5c534d]",
+          "transition-[color,background-color,transform] duration-200 ease-out hover:bg-[#faf7f2] hover:text-[#1a1614] active:scale-[0.98] disabled:opacity-50",
         )}
       >
-        {/* One shared highlight that slides between rows instead of blinking. */}
-        {active && (
-          <motion.span
-            layoutId="rail-active"
-            transition={INDICATOR}
-            className="absolute inset-0 rounded-md bg-[#8c4a32]/12 border border-[#8c4a32]/25"
-            aria-hidden
-          />
-        )}
-        {leading && <span className="relative">{leading}</span>}
-        <span className="relative min-w-0 flex-1">
-          <span className="font-medium block leading-snug">{label}</span>
-          {sub ? (
-            <span className="text-[11px] text-[#8a7f76] line-clamp-2 mt-0.5 block">
-              {sub}
-            </span>
-          ) : null}
+        <ArtistPhoto
+          name={item.headlinerName}
+          imageUrl={item.headlinerImageUrl}
+          rounded="full"
+          className="h-8 w-8 text-xs shrink-0 mt-0.5"
+        />
+        <span className="min-w-0 flex-1">
+          <span className="font-medium block leading-snug text-[#1a1614]">
+            {item.headlinerName}
+          </span>
+          <span className="text-[11px] text-[#8a7f76] line-clamp-2 mt-0.5 block">
+            {item.venueLabel} · {item.cityLabel}
+          </span>
         </span>
       </button>
-      {trailing && <span className="absolute right-2 top-2.5">{trailing}</span>}
+      <button
+        type="button"
+        className="absolute right-2 top-2.5 p-1 text-[#8a7f76] hover:text-[#8c4a32]"
+        aria-label={item.pinned ? "Unpin" : "Pin"}
+        onClick={onTogglePin}
+      >
+        <Star
+          className={cn(
+            "h-3.5 w-3.5",
+            item.pinned && "fill-[#8c4a32] text-[#8c4a32]",
+          )}
+        />
+      </button>
     </div>
   );
 }
 
-export function LineupSampleRailDesktop({
-  samples,
+/** Recent lineups, like a chat app's history. Hidden until there is one. */
+export function RecentRailDesktop({
   stored,
-  activeRequest,
-  onSelectRequest,
   onOpenStored,
   onTogglePin,
   disabled,
 }: Props) {
-  const pinned = stored.filter((s) => s.pinned);
-  const rest = stored.filter((s) => !s.pinned);
+  if (stored.length === 0) return null;
+  const ordered = [
+    ...stored.filter((s) => s.pinned),
+    ...stored.filter((s) => !s.pinned),
+  ];
 
   return (
-    <aside className="hidden lg:flex flex-col w-56 xl:w-64 shrink-0 border-r border-[#e8dfd6] bg-[#f3ece4]/80 min-h-0 overflow-hidden">
+    <aside
+      data-recent-rail
+      className="hidden lg:flex flex-col w-56 xl:w-64 shrink-0 border-r border-[#e8dfd6] bg-[#f3ece4]/80 min-h-0 overflow-hidden"
+    >
       <div className="p-4 border-b border-[#e8dfd6] shrink-0">
-        <p className="text-[10px] uppercase tracking-[0.24em] text-[#8c4a32]">
-          Example rooms
+        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8c4a32]">
+          Recent
         </p>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2 space-y-1">
-        {samples.map((ex) => (
-          <RailButton
-            key={ex.label}
-            label={ex.label}
-            sub={ex.request.regularsLove}
-            active={isActive(ex.request, activeRequest)}
-            disabled={disabled}
-            onClick={() => onSelectRequest(ex.request)}
-          />
-        ))}
-        {(pinned.length > 0 || rest.length > 0) && (
-          <p className="text-[10px] uppercase tracking-[0.22em] text-[#8a7f76] px-2 pt-3 pb-1">
-            Your lineups
-          </p>
-        )}
-        {[...pinned, ...rest].map((item) => (
-          <RailButton
+        {ordered.map((item) => (
+          <RecentRow
             key={item.id}
-            label={item.venueLabel}
-            sub={item.cityLabel}
-            active={false}
+            item={item}
             disabled={disabled}
-            onClick={() => onOpenStored(item)}
-            leading={
-              <ArtistPhoto
-                name={item.headlinerName}
-                imageUrl={item.headlinerImageUrl}
-                rounded="full"
-                className="h-8 w-8 text-xs shrink-0 mt-0.5"
-              />
-            }
-            trailing={
-              <button
-                type="button"
-                className="shrink-0 p-1 text-[#8a7f76] hover:text-[#8c4a32]"
-                aria-label={item.pinned ? "Unpin" : "Pin"}
-                onClick={() => onTogglePin(item.id)}
-              >
-                <Star
-                  className={cn(
-                    "h-3.5 w-3.5",
-                    item.pinned && "fill-[#8c4a32] text-[#8c4a32]",
-                  )}
-                />
-              </button>
-            }
+            onOpen={() => onOpenStored(item)}
+            onTogglePin={() => onTogglePin(item.id)}
           />
         ))}
       </div>
@@ -159,50 +106,33 @@ export function LineupSampleRailDesktop({
   );
 }
 
-export function LineupSampleRailMobile({
-  samples,
+export function RecentRailMobile({
   stored,
-  activeRequest,
-  onSelectRequest,
   onOpenStored,
   disabled,
 }: Omit<Props, "onTogglePin">) {
-  const chips = [
-    ...samples.map((ex) => ({
-      key: `sample-${ex.label}`,
-      label: ex.label,
-      onClick: () => onSelectRequest(ex.request),
-      active: isActive(ex.request, activeRequest),
-    })),
-    ...stored.slice(0, 4).map((item) => ({
-      key: `stored-${item.id}`,
-      label: item.venueLabel,
-      onClick: () => onOpenStored(item),
-      active: false,
-    })),
-  ];
+  if (stored.length === 0) return null;
 
   return (
     <div className="lg:hidden shrink-0 border-b border-[#e8dfd6] bg-[#f3ece4]/60 px-4 py-3">
-      <p className="text-[10px] uppercase tracking-[0.22em] text-[#8c4a32] mb-2">
-        Example rooms &amp; your lineups
+      <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8c4a32] mb-2">
+        Recent
       </p>
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x snap-mandatory">
-        {chips.map((chip) => (
+        {stored.slice(0, 6).map((item) => (
           <button
-            key={chip.key}
+            key={item.id}
             type="button"
             disabled={disabled}
-            onClick={chip.onClick}
+            onClick={() => onOpenStored(item)}
             className={cn(
-              "snap-start shrink-0 max-w-[14rem] rounded-full border px-3 py-1.5 text-xs text-left disabled:opacity-50",
+              "snap-start shrink-0 max-w-[14rem] rounded-full border border-[#e0d5ca] bg-[#fcf9f5] px-3 py-1.5 text-xs text-left text-[#1a1614] disabled:opacity-50",
               "transition-[color,background-color,border-color,transform] duration-200 ease-out active:scale-[0.97]",
-              chip.active
-                ? "border-[#8c4a32]/40 bg-[#8c4a32]/10 text-[#1a1614]"
-                : "border-[#e0d5ca] bg-[#fcf9f5] text-[#1a1614]",
             )}
           >
-            <span className="line-clamp-2">{chip.label}</span>
+            <span className="line-clamp-1">
+              {item.headlinerName} · {item.venueLabel}
+            </span>
           </button>
         ))}
       </div>

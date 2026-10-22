@@ -42,7 +42,7 @@ export function AgentStreamingPoster({
       ? {
           venueLabel: venueTitle,
           address: "",
-          moodLine: "Building your one-night poster…",
+          moodLine: "Scouting your night…",
           headlinerWhy: "",
           openerWhy: "",
           headliner: {
@@ -101,11 +101,8 @@ export function AgentStreamingPoster({
       )}
       aria-busy={!state.pitch}
     >
-      <header className="px-5 pt-5 pb-3 border-b border-[#e0d5ca]">
-        <p className="text-[10px] uppercase tracking-[0.28em] text-[#8c4a32]">
-          One night
-        </p>
-        <p className="font-[family-name:var(--font-heading)] text-xl mt-1">
+      <header className="px-5 pt-4 pb-3 border-b border-[#e0d5ca]">
+        <p className="font-heading text-xl">
           {state.pitch?.venueLabel ?? venueTitle}
         </p>
         <p className="text-sm text-[#6b5c52] mt-2">{partialPitch.moodLine}</p>

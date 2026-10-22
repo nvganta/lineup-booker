@@ -2,6 +2,7 @@
 
 import { AgentScoutStream } from "@/components/agent-scout-stream";
 import { AgentStreamingPoster } from "@/components/agent-streaming-poster";
+import { FirstRunPanel, type ExampleRoom } from "@/components/first-run-panel";
 import { LineupPosterCard } from "@/components/lineup-poster-card";
 import type { AgentStreamState } from "@/lib/agent/consume-agent-stream";
 import type { PitchPayload } from "@/lib/agent/types";
@@ -14,26 +15,6 @@ import type { LineupRequest } from "@/lib/lineup/schemas";
 import { fadeUp } from "@/lib/motion";
 import { motion } from "motion/react";
 
-function EmptyState() {
-  return (
-    <motion.div
-      {...fadeUp}
-      className={cn(
-        FEED_BLOCK_CLASS,
-        "rounded-sm border border-dashed border-[#e0d5ca] p-8 min-h-[280px] flex flex-col items-center justify-center text-center",
-      )}
-    >
-      <p className="font-heading text-xl text-[#1a1614]">
-        Your night shows up here
-      </p>
-      <p className="mt-1.5 max-w-xs text-sm text-[#8a7f76]">
-        Describe your room and the scout picks a headliner, a local opener, and
-        where to put the posters up.
-      </p>
-    </motion.div>
-  );
-}
-
 type Props = {
   loading: boolean;
   error: string | null;
@@ -42,9 +23,8 @@ type Props = {
   savedPitch: PitchPayload | null;
   /** Set when the saved pitch is a stored example run, not one scouted just now. */
   savedVenue?: { lat: number; lon: number };
-  savedRunDate?: string;
-  /** The saved example run is still on its way; hold a quiet placeholder instead of the empty state. */
-  sampleLoading?: boolean;
+  examples: ExampleRoom[];
+  onSelectExample: (request: LineupRequest) => void;
   className?: string;
   scrollRef?: React.RefObject<HTMLElement | null>;
 };
@@ -56,13 +36,13 @@ export function LineupResultPane({
   form,
   savedPitch,
   savedVenue,
-  savedRunDate,
-  sampleLoading,
+  examples,
+  onSelectExample,
   className,
   scrollRef,
 }: Props) {
   const pitch = savedPitch ?? agentState?.pitch;
-  const showEmpty = !loading && !pitch && !error;
+  const showFirstRun = !loading && !pitch && !error;
 
   return (
     <section
@@ -126,23 +106,17 @@ export function LineupResultPane({
             className={FEED_CARD_CLASS}
             wideFeed
             animateSettle
-            previewBadge={savedRunDate ? "saved-run" : null}
           />
         </div>
       )}
 
-      {showEmpty &&
-        (sampleLoading ? (
-          <div
-            className={cn(
-              FEED_BLOCK_CLASS,
-              "rounded-sm border border-[#e8dfd6] bg-[#f7f2eb] min-h-[420px] animate-pulse",
-            )}
-            aria-busy="true"
-          />
-        ) : (
-          <EmptyState />
-        ))}
+      {showFirstRun && (
+        <FirstRunPanel
+          examples={examples}
+          onSelect={onSelectExample}
+          disabled={loading}
+        />
+      )}
     </section>
   );
 }

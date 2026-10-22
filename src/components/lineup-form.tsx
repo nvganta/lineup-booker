@@ -43,7 +43,7 @@ export function LineupForm({
           Book the room they&apos;ll show up for
         </h1>
         <p className="text-sm text-[#6b5c52]">
-          Headliner, opener, neighborhoods.
+          Three lines about your room. The scout does the rest.
         </p>
       </header>
 
@@ -62,6 +62,7 @@ export function LineupForm({
               onChange={(e) =>
                 onChange({ ...value, concept: e.target.value })
               }
+              placeholder="Natural wine bar, 120 seats"
               className="h-11 pl-10 text-base bg-[#fcf9f5] border-[#e8dfd6] rounded-lg"
               required
             />
@@ -82,6 +83,7 @@ export function LineupForm({
               onChange={(e) =>
                 onChange({ ...value, location: e.target.value })
               }
+              placeholder="2509 Main St, Vancouver, BC"
               className="h-11 pl-10 text-base bg-[#fcf9f5] border-[#e8dfd6] rounded-lg"
               required
             />
@@ -108,6 +110,7 @@ export function LineupForm({
                 onChange({ ...value, regularsLove: e.target.value })
               }
               rows={2}
+              placeholder="Indie folk, vinyl nights"
               className="min-h-[4.5rem] pl-10 text-base bg-[#fcf9f5] border-[#e8dfd6] rounded-lg resize-none py-2.5"
               required
             />

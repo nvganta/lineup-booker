@@ -23,8 +23,8 @@ const STEPS = [
   },
   {
     n: 4,
-    title: "You get a lineup.",
-    body: "A ready poster, plus the data behind it.",
+    title: "You get a night to book.",
+    body: "Who to book, what to sell, where to promote, and every Qloo call behind it.",
   },
 ] as const;
 

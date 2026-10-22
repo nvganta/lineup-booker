@@ -1,12 +1,13 @@
 "use client";
 
 import { AppShellTopBar } from "@/components/app-shell-top-bar";
+import type { ExampleRoom } from "@/components/first-run-panel";
 import { HowItWorksDialog } from "@/components/how-it-works-dialog";
 import { LineupForm } from "@/components/lineup-form";
 import { LineupResultPane } from "@/components/lineup-result-pane";
 import {
-  LineupSampleRailDesktop,
-  LineupSampleRailMobile,
+  RecentRailDesktop,
+  RecentRailMobile,
 } from "@/components/lineup-sample-rail";
 import {
   consumeAgentStream,
@@ -32,10 +33,15 @@ import {
   upsertStoredLineup,
   type StoredLineup,
 } from "@/lib/stored-lineups";
+import { cn } from "@/lib/utils";
 import { MotionConfig } from "motion/react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
-const DEFAULT_REQUEST: LineupRequest = EXAMPLE_VENUES[0]!.request;
+const EMPTY_REQUEST: LineupRequest = {
+  concept: "",
+  location: "",
+  regularsLove: "",
+};
 
 function sampleRunFor(
   request: LineupRequest,
@@ -51,18 +57,15 @@ export function HomePageClient() {
   const [error, setError] = useState<string | null>(null);
   const [addressError, setAddressError] = useState<string | null>(null);
   const [agentState, setAgentState] = useState<AgentStreamState | null>(null);
-  const [form, setForm] = useState<LineupRequest>(DEFAULT_REQUEST);
+  const [form, setForm] = useState<LineupRequest>(EMPTY_REQUEST);
   const storedLineups = useSyncExternalStore(
     subscribeStoredLineups,
     loadStoredLineups,
     getServerStoredLineups,
   );
   const [sampleRuns, setSampleRuns] = useState<SampleRuns>({});
-  const [sampleRunsLoaded, setSampleRunsLoaded] = useState(false);
   const [savedRun, setSavedRun] = useState<SampleRun | null>(null);
   const [savedPitch, setSavedPitch] = useState<PitchPayload | null>(null);
-  // Set once the owner picks, opens or runs anything, so a late sample load can't replace it.
-  const ownerActed = useRef(false);
   const [howOpen, setHowOpen] = useState(false);
   const resultFeedRef = useRef<HTMLElement>(null);
 
@@ -73,7 +76,7 @@ export function HomePageClient() {
     };
   }, []);
 
-  // The first example room opens on its saved run: no Qloo calls on page load.
+  // Saved runs make the example rooms open instantly: no Qloo calls on page load.
   useEffect(() => {
     let live = true;
     fetch("/api/sample-runs")
@@ -85,21 +88,14 @@ export function HomePageClient() {
           rememberAnalytics(run);
         }
         setSampleRuns(runs);
-        const first = sampleRunFor(DEFAULT_REQUEST, runs);
-        if (first && !ownerActed.current) {
-          setSavedRun(first);
-          setSavedPitch(first.pitch);
-        }
       })
-      .catch(() => {})
-      .finally(() => live && setSampleRunsLoaded(true));
+      .catch(() => {});
     return () => {
       live = false;
     };
   }, []);
 
   function selectRequest(request: LineupRequest) {
-    ownerActed.current = true;
     const run = sampleRunFor(request, sampleRuns);
     setForm(request);
     setAddressError(null);
@@ -110,7 +106,6 @@ export function HomePageClient() {
   }
 
   function openStored(item: StoredLineup) {
-    ownerActed.current = true;
     setForm(item.request);
     setSavedRun(null);
     setSavedPitch(item.pitch);
@@ -120,8 +115,7 @@ export function HomePageClient() {
   }
 
   function handleNewLineup() {
-    ownerActed.current = true;
-    setForm(DEFAULT_REQUEST);
+    setForm(EMPTY_REQUEST);
     setSavedRun(null);
     setSavedPitch(null);
     setAgentState(null);
@@ -145,7 +139,6 @@ export function HomePageClient() {
   }
 
   async function handleSubmit(data: LineupRequest) {
-    ownerActed.current = true;
     setLoading(true);
     setError(null);
     setAddressError(null);
@@ -200,11 +193,14 @@ export function HomePageClient() {
     }
   }
 
+  const examples: ExampleRoom[] = EXAMPLE_VENUES.map((venue) => ({
+    venue,
+    run: sampleRuns[venue.request.location] ?? null,
+  }));
+  const hasResult = loading || Boolean(savedPitch) || Boolean(agentState);
+
   const railProps = {
-    samples: EXAMPLE_VENUES,
     stored: storedLineups,
-    activeRequest: form,
-    onSelectRequest: selectRequest,
     onOpenStored: openStored,
     onTogglePin: (id: string) => {
       toggleStoredPin(id);
@@ -229,10 +225,10 @@ export function HomePageClient() {
           onNewLineup={handleNewLineup}
         />
         <HowItWorksDialog open={howOpen} onClose={() => setHowOpen(false)} />
-        <LineupSampleRailMobile {...railProps} />
+        <RecentRailMobile {...railProps} />
 
         <div className="relative z-10 flex flex-col lg:flex-row flex-1 min-h-0 max-lg:overflow-visible">
-          <LineupSampleRailDesktop {...railProps} />
+          <RecentRailDesktop {...railProps} />
 
           <div className="flex flex-col lg:flex-row flex-1 min-h-0 max-lg:overflow-visible">
             <div className="shrink-0 w-full lg:w-[20rem] xl:w-[22rem] lg:border-r border-[#e8dfd6] bg-[#faf7f2]/95 lg:overflow-hidden px-4 py-5 lg:px-5">
@@ -243,6 +239,29 @@ export function HomePageClient() {
                 loading={loading}
                 addressError={addressError}
               />
+              {hasResult && (
+                <div className="mt-6 pt-4 border-t border-[#e8dfd6]">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8a7f76] mb-2">
+                    Try a room
+                  </p>
+                  <ul className="list-none space-y-1">
+                    {EXAMPLE_VENUES.map((ex) => (
+                      <li key={ex.label}>
+                        <button
+                          type="button"
+                          disabled={loading}
+                          onClick={() => selectRequest(ex.request)}
+                          className={cn(
+                            "text-sm text-[#6b5c52] hover:text-[#8c4a32] disabled:opacity-50 transition-colors",
+                          )}
+                        >
+                          {ex.label}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
 
             <LineupResultPane
@@ -252,8 +271,8 @@ export function HomePageClient() {
               form={form}
               savedPitch={savedPitch}
               savedVenue={savedRun?.venue}
-              savedRunDate={savedRun?.savedAt}
-              sampleLoading={!sampleRunsLoaded}
+              examples={examples}
+              onSelectExample={selectRequest}
               scrollRef={resultFeedRef}
             />
           </div>

@@ -6,11 +6,12 @@ import { motion } from "motion/react";
 
 export type ResultTab = "lineup" | "food" | "marketing" | "data";
 
+/** Each tab is the owner's question, not the data's name. */
 const TABS: Array<{ id: ResultTab; label: string }> = [
-  { id: "lineup", label: "Lineup" },
-  { id: "food", label: "Food & deals" },
-  { id: "marketing", label: "Marketing" },
-  { id: "data", label: "Data" },
+  { id: "lineup", label: "Who to book" },
+  { id: "food", label: "What to sell" },
+  { id: "marketing", label: "Where to promote" },
+  { id: "data", label: "How we got here" },
 ];
 
 type Props = {
@@ -44,7 +45,7 @@ export function ResultTabs({ value, onChange, className }: Props) {
             onClick={() => onChange(t.id)}
             className={cn(
               "relative min-w-0 justify-self-stretch text-center pb-[9px] -mb-px cursor-pointer transition-colors duration-200",
-              "text-[10px] sm:text-[11px] font-medium uppercase leading-none tracking-[0.08em] sm:tracking-[0.16em] whitespace-nowrap",
+              "text-[12px] sm:text-[13px] font-medium leading-none tracking-[-0.01em] whitespace-nowrap",
               "focus-visible:outline-none focus-visible:text-[#1a1614]",
               on ? "text-[#1a1614]" : "text-[#6b5c52] hover:text-[#1a1614]",
             )}
