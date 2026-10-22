@@ -27,14 +27,16 @@ type Props = {
 export function FirstRunPanel({ examples, onSelect, disabled }: Props) {
   return (
     <motion.div {...fadeUp} className={cn(FEED_BLOCK_CLASS, "space-y-6")} data-first-run>
-      <header className="max-w-2xl">
-        <h2 className="font-heading text-[30px] leading-[1.1] text-[#1a1614]">
-          Tell us about your place.
-        </h2>
-        <p className="mt-1.5 text-[15px] leading-snug text-[#6b5c52] text-balance">
-          We&apos;ll tell you who to book, who&apos;ll come, what they&apos;ll
-          order, and where to find them.
+      <header className="font-display text-[#1a1614]">
+        <h2 className="text-[34px] leading-[1.08]">Tell us about your place.</h2>
+        <p className="mt-3 text-[26px] leading-[1.2]">
+          We&apos;ll tell you who to book.
         </p>
+        <ul className="list-none text-[26px] leading-[1.2] text-[#6b5c52]">
+          <li>Who&apos;ll come.</li>
+          <li>What they&apos;ll order.</li>
+          <li>Where to find them.</li>
+        </ul>
       </header>
 
       <section>

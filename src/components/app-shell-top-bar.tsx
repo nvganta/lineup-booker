@@ -10,7 +10,7 @@ type Props = {
 export function AppShellTopBar({ onHowItWorks, onNewLineup }: Props) {
   return (
     <header className="shrink-0 flex items-center justify-between gap-4 border-b border-[#e8dfd6] bg-[#faf7f2]/95 backdrop-blur-sm px-4 lg:px-5 h-12 z-20">
-      <span className="font-heading text-lg text-[#1a1614] tracking-tight">
+      <span className="font-display text-xl text-[#1a1614]">
         Lineup Booker
       </span>
       <div className="flex items-center gap-3">

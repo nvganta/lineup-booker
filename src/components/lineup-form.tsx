@@ -39,7 +39,7 @@ export function LineupForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-none">
       <header className="space-y-1">
-        <h1 className="font-heading text-2xl xl:text-[1.75rem] font-medium tracking-tight text-balance leading-[1.08] text-[#1a1614]">
+        <h1 className="font-display text-[1.75rem] xl:text-[2rem] text-balance leading-[1.08] text-[#1a1614]">
           Book the room they&apos;ll show up for
         </h1>
         <p className="text-sm text-[#6b5c52]">
