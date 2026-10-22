@@ -97,6 +97,12 @@ export function LandingHero({
 
             <form
               onSubmit={handleSubmit}
+              onBlur={(e) => {
+                // Focus moved outside the box: fold it back to one line.
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                  setOpen(false);
+                }
+              }}
               className={cn(
                 "mt-7 max-w-xl rounded-[22px] border border-[#e0d5ca] bg-[#fcf9f5]",
                 "shadow-[0_1px_0_rgba(26,22,20,0.04),0_14px_30px_-22px_rgba(26,22,20,0.35)]",
@@ -116,9 +122,7 @@ export function LandingHero({
                   onChange={(e) => set("concept", e.target.value)}
                   onFocus={() => setOpen(true)}
                   placeholder={
-                    open
-                      ? "Natural wine bar, 120 seats"
-                      : "Describe your venue (e.g. natural wine bar, 120 seats, Vancouver)"
+                    open ? "Natural wine bar, 120 seats" : "Describe your venue"
                   }
                   className={cn(FIELD_CLASS, "h-10")}
                   autoComplete="off"
@@ -127,7 +131,7 @@ export function LandingHero({
                   <Button
                     type="submit"
                     disabled={loading}
-                    className="hidden sm:inline-flex h-11 shrink-0 rounded-full bg-[#8c4a32] px-5 text-[15px] text-[#faf7f2] hover:bg-[#7a4030]"
+                    className="h-11 shrink-0 rounded-full bg-[#8c4a32] px-5 text-[15px] text-[#faf7f2] hover:bg-[#7a4030]"
                   >
                     Find my lineup
                     <ArrowRight className="ml-1.5 size-4" />
@@ -178,7 +182,7 @@ export function LandingHero({
                       <Button
                         type="submit"
                         disabled={loading}
-                        className="hidden sm:inline-flex h-11 shrink-0 rounded-full bg-[#8c4a32] px-5 text-[15px] text-[#faf7f2] hover:bg-[#7a4030]"
+                        className="h-11 shrink-0 rounded-full bg-[#8c4a32] px-5 text-[15px] text-[#faf7f2] hover:bg-[#7a4030]"
                       >
                         {loading ? "Scouting…" : "Find my lineup"}
                         {!loading && <ArrowRight className="ml-1.5 size-4" />}
@@ -187,17 +191,6 @@ export function LandingHero({
                   </motion.div>
                 )}
               </AnimatePresence>
-              {/* Phones: the button gets its own row under the fields. */}
-              <div className="sm:hidden border-t border-[#e8dfd6] p-2">
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="h-11 w-full rounded-full bg-[#8c4a32] text-[15px] text-[#faf7f2] hover:bg-[#7a4030]"
-                >
-                  {loading ? "Scouting…" : "Find my lineup"}
-                  {!loading && <ArrowRight className="ml-1.5 size-4" />}
-                </Button>
-              </div>
             </form>
             {missing && (
               <p className="mt-2 text-[13px] text-[#a3402a]" role="alert">
