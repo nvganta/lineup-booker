@@ -24,7 +24,6 @@ import {
   crowdTopPositiveAgeRow,
   formatCrowdDisplay,
 } from "@/lib/lineup/crowd-display";
-import { formatSkewIndex } from "@/lib/lineup/crowd-skew-display";
 import { drawLine } from "@/lib/lineup/draw-line";
 import { popularityBandFromConcept } from "@/lib/lineup/tiers";
 import {
@@ -521,8 +520,10 @@ export function LineupPage({
     openerDraw && `${openerDraw.label}: ${openerDraw.line}`,
   ].filter((s): s is string => Boolean(s));
 
+  // The one line under the title says why these acts, not what the owner typed.
   const subtitle = [
-    `We found artists who fit your place, your crowd, and your vibe.`,
+    pitch.moodLine?.trim() ||
+      `Acts that ${styleTags[0] ? `${styleTags[0]} fans` : "your crowd"} near ${venueCity ?? "you"} already go out for, sized to the room.`,
     when && `For ${when}.`,
   ]
     .filter(Boolean)
@@ -570,56 +571,7 @@ export function LineupPage({
           }
         />
 
-        {/* Venue card */}
-        <div
-          className={cn(
-            CARD,
-            "grid grid-cols-1 md:grid-cols-[1fr_minmax(0,320px)] gap-0 overflow-hidden",
-          )}
-        >
-          <div className="flex gap-4 p-4">
-            <div className="flex size-[72px] shrink-0 items-center justify-center rounded-md bg-[#8c4a32]/10 font-display text-[28px] text-[#8c4a32]">
-              {pitch.venueLabel.charAt(0).toUpperCase()}
-            </div>
-            <div className="min-w-0">
-              <p className="font-heading text-[17px] leading-tight">
-                {pitch.venueLabel}
-              </p>
-              <p className="mt-0.5 text-[12px] text-[#6b5c52]">
-                {capacity ? `${capacity} seats · ` : ""}
-                {pitch.address}
-              </p>
-              <div className="mt-2.5 flex flex-wrap gap-1.5">
-                {styleTags.map((t) => (
-                  <Chip key={t}>{t}</Chip>
-                ))}
-                {topAge && (
-                  <Chip accent>
-                    <span title={`Qloo skew ${formatSkewIndex(topAge.value)}`}>
-                      Ages {topAge.label}
-                    </span>
-                  </Chip>
-                )}
-                {genderLean && <Chip accent>Leans {genderLean}</Chip>}
-                {when && <Chip>{when}</Chip>}
-              </div>
-            </div>
-          </div>
-          <div className="border-t md:border-t-0 md:border-l border-[#e8dfd6] bg-[#f3ece4]/70 p-4">
-            <p className="text-[12.5px] font-medium text-[#1a1614] mb-1">
-              Why this lineup?
-            </p>
-            <p className="text-[12.5px] leading-[1.5] text-[#5c534d]">
-              {pitch.moodLine?.trim() ||
-                `Acts that ${styleTags[0] ? `${styleTags[0]} fans` : "your crowd"} near ${venueCity ?? "you"} already go out for, sized to the room.`}
-              {crowdLine
-                ? ` Qloo reads the crowd as ${crowdLine.toLowerCase()}.`
-                : ""}
-            </p>
-          </div>
-        </div>
-
-        {/* The night brief slides open under the venue card and stays there. */}
+        {/* The night brief slides open under the title and stays there. */}
         <AnimatePresence initial={false}>
           {booking === "night" && (
             <motion.div
@@ -645,12 +597,7 @@ export function LineupPage({
 
         {
           <>
-            <div className="mt-8">
-              <SectionHead
-                id="acts"
-                title="Recommended lineup"
-                sub="A complete night, from opener to headliner."
-              />
+            <div className="mt-1">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
                 <AnimatePresence mode="popLayout" initial={false}>
                   {pitch.opener && (
