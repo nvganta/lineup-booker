@@ -45,6 +45,21 @@ const EMPTY_REQUEST: LineupRequest = {
   regularsLove: "",
 };
 
+/** Remember a finished run in the Recent rail (localStorage). */
+function persistPitch(request: LineupRequest, pitch: PitchPayload) {
+  const entry: StoredLineup = {
+    id: storedLineupId(request, pitch),
+    venueLabel: pitch.venueLabel,
+    cityLabel: pitch.meta?.cityLabel ?? cityFromRequest(request),
+    headlinerName: pitch.headliner.name,
+    headlinerImageUrl: pitch.headliner.imageUrl,
+    request,
+    pitch,
+    savedAt: Date.now(),
+  };
+  upsertStoredLineup(entry);
+}
+
 function sampleRunFor(
   request: LineupRequest,
   runs: SampleRuns,
@@ -117,6 +132,8 @@ export function HomePageClient() {
     setSavedPitch(run?.pitch ?? null);
     setAgentState(null);
     setError(null);
+    // No saved run for this room: scout it live, so the click always shows something.
+    if (!run) void handleSubmit(request);
   }
 
   function openStored(item: StoredLineup) {
@@ -140,20 +157,6 @@ export function HomePageClient() {
     setError(null);
     setAddressError(null);
     setLoading(false);
-  }
-
-  function persistPitch(request: LineupRequest, pitch: PitchPayload) {
-    const entry: StoredLineup = {
-      id: storedLineupId(request, pitch),
-      venueLabel: pitch.venueLabel,
-      cityLabel: pitch.meta?.cityLabel ?? cityFromRequest(request),
-      headlinerName: pitch.headliner.name,
-      headlinerImageUrl: pitch.headliner.imageUrl,
-      request,
-      pitch,
-      savedAt: Date.now(),
-    };
-    upsertStoredLineup(entry);
   }
 
   async function handleSubmit(data: LineupRequest) {
