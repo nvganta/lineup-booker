@@ -93,10 +93,10 @@ function SectionHead({
   return (
     <div
       id={id}
-      className="scroll-mt-16 flex items-end justify-between gap-4 mb-3.5"
+      className="scroll-mt-16 flex items-end justify-between gap-4 mb-4"
     >
       <div>
-        <h2 className="font-display text-[26px] leading-[1.1] text-[#1a1614]">
+        <h2 className="font-display text-[28px] leading-[1.1] text-[#1a1614]">
           {title}
         </h2>
         {sub && <p className="mt-1 text-[13px] text-[#6b5c52]">{sub}</p>}
@@ -581,9 +581,10 @@ export function LineupPage({
                 <button
                   type="button"
                   onClick={() => jump("how")}
-                  className="rounded-full border border-[#e0d5ca] bg-[#fcf9f5] px-2.5 py-1 text-[11px] text-[#6b5c52] hover:text-[#8c4a32] transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[#e0d5ca] bg-[#fcf9f5] px-3 py-1.5 text-[12px] leading-none text-[#5c534d] hover:text-[#8c4a32] hover:border-[#8c4a32]/40 transition-colors cursor-pointer"
                   data-qloo-count
                 >
+                  <span className="size-1.5 rounded-full bg-[#8c4a32]" aria-hidden />
                   {qlooCallCount} Qloo lookups
                 </button>
               )}
@@ -593,7 +594,7 @@ export function LineupPage({
                   setBooking((b) => (b === "night" ? null : "night"))
                 }
                 aria-expanded={booking === "night"}
-                className="rounded-full bg-[#1a1614] hover:bg-[#2d2622] text-[#faf7f2] text-sm"
+                className="h-9 rounded-full bg-[#1a1614] px-5 text-[13px] text-[#faf7f2] shadow-[0_1px_2px_rgba(26,22,20,0.25)] hover:bg-[#2d2622] transition-colors"
                 data-book-it
               >
                 {booking === "night" ? "Close" : "Book it"}
