@@ -23,6 +23,7 @@ type Props = {
   /** Set when the saved pitch is a stored example run, not one scouted just now. */
   savedVenue?: { lat: number; lon: number };
   onAudience?: (line: string | null) => void;
+  onActiveSection?: (id: string) => void;
   className?: string;
   scrollRef?: React.RefObject<HTMLElement | null>;
 };
@@ -35,6 +36,7 @@ export function LineupResultPane({
   savedPitch,
   savedVenue,
   onAudience,
+  onActiveSection,
   className,
   scrollRef,
 }: Props) {
@@ -95,6 +97,7 @@ export function LineupResultPane({
             venue={agentState?.map?.venue ?? savedVenue}
             when={form.when?.trim() || undefined}
             onAudience={onAudience}
+            onActiveSection={onActiveSection}
             className={FEED_CARD_CLASS}
             animateSettle
           />

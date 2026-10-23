@@ -50,11 +50,14 @@ type Props = {
   when?: string;
   /** Reports Qloo's crowd read up to the summary column. */
   onAudience?: (line: string | null) => void;
+  /** Reports which section is in view, for the links in the top bar. */
+  onActiveSection?: (id: string) => void;
   className?: string;
   animateSettle?: boolean;
 };
 
-const SECTIONS = [
+/** The page's sections, in order; the top bar shows them as links. */
+export const PAGE_SECTIONS = [
   { id: "lineup", label: "Lineup" },
   { id: "sell", label: "What to sell" },
   { id: "promote", label: "Where to promote" },
@@ -271,6 +274,7 @@ export function LineupPage({
   venue,
   when,
   onAudience,
+  onActiveSection,
   className,
   animateSettle,
 }: Props) {
@@ -287,8 +291,6 @@ export function LineupPage({
   const [booking, setBooking] = useState<
     "night" | "headliner" | "opener" | null
   >(null);
-  const [active, setActive] =
-    useState<(typeof SECTIONS)[number]["id"]>("lineup");
   const rootRef = useRef<HTMLDivElement>(null);
   const analyticsInput = analyticsInputFromPitch(pitch);
   const analyticsState = usePitchAnalytics(analyticsInput, analyticsRev);
@@ -466,8 +468,7 @@ export function LineupPage({
     ],
   );
 
-  // Section links scroll inside the result pane, and the link for the section
-  // in view stays lit.
+  // The top bar lights the link for the section in view.
   const jump = useCallback((id: string) => {
     rootRef.current?.querySelector<HTMLElement>(`#${id}`)?.scrollIntoView({
       behavior: "smooth",
@@ -476,8 +477,8 @@ export function LineupPage({
   }, []);
   useEffect(() => {
     const root = rootRef.current;
-    if (!root) return;
-    const heads = SECTIONS.map((s) =>
+    if (!root || !onActiveSection) return;
+    const heads = PAGE_SECTIONS.map((s) =>
       root.querySelector<HTMLElement>(`#${s.id}`),
     ).filter((el): el is HTMLElement => Boolean(el));
     const scroller = root.closest<HTMLElement>("[data-result-feed]");
@@ -488,13 +489,13 @@ export function LineupPage({
           .sort(
             (a, b) => a.boundingClientRect.top - b.boundingClientRect.top,
           )[0];
-        if (hit) setActive(hit.target.id as (typeof SECTIONS)[number]["id"]);
+        if (hit) onActiveSection(hit.target.id);
       },
       { root: scroller, rootMargin: "-10% 0px -70% 0px", threshold: 0 },
     );
     heads.forEach((h) => io.observe(h));
     return () => io.disconnect();
-  }, [booking]);
+  }, [booking, onActiveSection]);
 
   const qlooCallCount =
     (pitch.qlooCalls?.length ?? 0) + (analytics?.qlooCalls?.length ?? 0);
@@ -528,41 +529,11 @@ export function LineupPage({
     .join(" ");
 
   return (
-    <div ref={rootRef} className={cn("space-y-10", className)} data-lineup-page>
-      {/* Section links */}
-      <nav
-        aria-label="Sections"
-        className="sticky top-0 z-20 -mx-1 flex gap-1 overflow-x-auto bg-[#faf7f2]/95 backdrop-blur-sm px-1 py-2 border-b border-[#e8dfd6]"
-      >
-        {SECTIONS.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => jump(s.id)}
-            data-section-link={s.id}
-            aria-current={active === s.id ? "true" : undefined}
-            className={cn(
-              "shrink-0 rounded-full px-3 py-1.5 text-[12.5px] transition-colors cursor-pointer",
-              active === s.id
-                ? "bg-[#1a1614] text-[#faf7f2]"
-                : "text-[#6b5c52] hover:text-[#1a1614] hover:bg-[#f0e8de]",
-            )}
-          >
-            {s.label}
-          </button>
-        ))}
-        {qlooCallCount > 0 && (
-          <button
-            type="button"
-            onClick={() => jump("how")}
-            className="ml-auto shrink-0 rounded-full border border-[#e0d5ca] bg-[#fcf9f5] px-2.5 py-1 text-[11px] text-[#6b5c52] hover:text-[#8c4a32] transition-colors cursor-pointer"
-            data-qloo-count
-          >
-            {qlooCallCount} Qloo lookups
-          </button>
-        )}
-      </nav>
-
+    <div
+      ref={rootRef}
+      className={cn("space-y-10 pt-5", className)}
+      data-lineup-page
+    >
       <motion.section
         initial={animateSettle ? { opacity: 0, y: 10 } : false}
         animate={animateSettle ? { opacity: 1, y: 0 } : undefined}
@@ -573,17 +544,29 @@ export function LineupPage({
           title="Here's your lineup."
           sub={subtitle}
           action={
-            <Button
-              type="button"
-              onClick={() =>
-                setBooking((b) => (b === "night" ? null : "night"))
-              }
-              aria-expanded={booking === "night"}
-              className="rounded-full bg-[#1a1614] hover:bg-[#2d2622] text-[#faf7f2] text-sm"
-              data-book-it
-            >
-              {booking === "night" ? "Close" : "Book it"}
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              {qlooCallCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => jump("how")}
+                  className="rounded-full border border-[#e0d5ca] bg-[#fcf9f5] px-2.5 py-1 text-[11px] text-[#6b5c52] hover:text-[#8c4a32] transition-colors cursor-pointer"
+                  data-qloo-count
+                >
+                  {qlooCallCount} Qloo lookups
+                </button>
+              )}
+              <Button
+                type="button"
+                onClick={() =>
+                  setBooking((b) => (b === "night" ? null : "night"))
+                }
+                aria-expanded={booking === "night"}
+                className="rounded-full bg-[#1a1614] hover:bg-[#2d2622] text-[#faf7f2] text-sm"
+                data-book-it
+              >
+                {booking === "night" ? "Close" : "Book it"}
+              </Button>
+            </div>
           }
         />
 

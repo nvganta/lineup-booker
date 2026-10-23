@@ -4,6 +4,7 @@ import { AppShellTopBar } from "@/components/app-shell-top-bar";
 import { HowItWorksDialog } from "@/components/how-it-works-dialog";
 import { LandingHero } from "@/components/landing-hero";
 import { LineupForm } from "@/components/lineup-form";
+import { PAGE_SECTIONS } from "@/components/lineup-page";
 import { LineupResultPane } from "@/components/lineup-result-pane";
 import { VenueSummary } from "@/components/venue-summary";
 import {
@@ -71,7 +72,14 @@ export function HomePageClient() {
   // The left column plays the request back once a lineup is up; Edit details reopens the form.
   const [editing, setEditing] = useState(false);
   const [audience, setAudience] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState("lineup");
   const resultFeedRef = useRef<HTMLElement>(null);
+
+  function jumpToSection(id: string) {
+    resultFeedRef.current
+      ?.querySelector<HTMLElement>(`#${id}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   useEffect(() => {
     document.body.classList.add("lineup-app-shell");
@@ -232,7 +240,10 @@ export function HomePageClient() {
 
         <AppShellTopBar
           onHowItWorks={() => setHowOpen(true)}
-          onNewLineup={handleNewLineup}
+          onHome={handleNewLineup}
+          sections={shownPitch && !loading ? [...PAGE_SECTIONS] : []}
+          activeSection={activeSection}
+          onJump={jumpToSection}
         />
         <HowItWorksDialog open={howOpen} onClose={() => setHowOpen(false)} />
 
@@ -307,6 +318,7 @@ export function HomePageClient() {
                   savedPitch={savedPitch}
                   savedVenue={savedRun?.venue}
                   onAudience={setAudience}
+                  onActiveSection={setActiveSection}
                   scrollRef={resultFeedRef}
                 />
               </div>
