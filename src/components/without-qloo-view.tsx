@@ -178,36 +178,54 @@ export function WithoutQlooView({ pitch, venueCity, form, headlinerLine, openerL
     // Sized by the result pane, not the window: the pane is narrow beside the form.
     <div data-compare-view className="@container">
       {plain && <Tally marks={allMarks} />}
-      <div className="grid grid-cols-1 @xl:grid-cols-2 gap-3.5 items-stretch">
-        <motion.article initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={ENTER} className={cn(POSTER_ARTICLE_CLASS, "max-w-none")} data-compare="qloo">
+      {/* Four shared rows (head, headliner, opener, poster spots) via subgrid, so the two cards line up row for row. */}
+      <div className="grid grid-cols-1 @xl:grid-cols-2 @xl:grid-rows-[auto_auto_auto_auto] gap-3.5 items-stretch">
+        <motion.article
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={ENTER}
+          className={cn(POSTER_ARTICLE_CLASS, "max-w-none @xl:grid @xl:row-span-4 @xl:grid-rows-subgrid")}
+          data-compare="qloo"
+        >
           <Head title="With Qloo" />
           <Act role="Headliner" name={pitch.headliner.name} line={headlinerLine} imageUrl={pitch.headliner.imageUrl} />
-          {pitch.opener && <Act role="Opener" name={pitch.opener.name} line={openerLine} imageUrl={pitch.opener.imageUrl} />}
-          {qlooHoods.length > 0 && <Hoods names={qlooHoods.map((h) => h.name)} />}
+          {pitch.opener ? (
+            <Act role="Opener" name={pitch.opener.name} line={openerLine} imageUrl={pitch.opener.imageUrl} />
+          ) : (
+            <div className="border-b border-[#e8dfd6]" />
+          )}
+          {qlooHoods.length > 0 ? <Hoods names={qlooHoods.map((h) => h.name)} /> : <div />}
         </motion.article>
         <motion.article
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...ENTER, delay: 0.06 }}
-          layout="size"
-          className={cn(POSTER_ARTICLE_CLASS, "max-w-none overflow-hidden")}
+          className={cn(POSTER_ARTICLE_CLASS, "max-w-none overflow-hidden @xl:grid @xl:row-span-4 @xl:grid-rows-subgrid")}
           data-compare="plain"
         >
           <Head title="Without Qloo" aside="Model only, no Qloo data" />
           {state.status === "loading" ? (
-            <PlainSkeleton />
+            <div className="@xl:row-span-3">
+              <PlainSkeleton />
+            </div>
           ) : state.status === "error" ? (
-            <div className="px-5 py-4">
+            <div className="px-5 py-4 @xl:row-span-3">
               <Muted>The model didn&apos;t answer this time.</Muted>
             </div>
           ) : (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={ENTER}>
+            <>
               <Act role="Headliner" name={state.result.answer.headliner.name} line={state.result.answer.headliner.why} quote imageUrl={state.result.headlinerImageUrl} marks={state.result.marks.headliner} delay={0.12} />
-              {state.result.answer.opener && (
+              {state.result.answer.opener ? (
                 <Act role="Opener" name={state.result.answer.opener.name} line={state.result.answer.opener.why} quote marks={state.result.marks.opener} delay={0.18} />
+              ) : (
+                <div className="border-b border-[#e8dfd6]" />
               )}
-              {state.result.answer.neighbourhoods.length > 0 && <Hoods names={state.result.answer.neighbourhoods} marks={hoodMarks} delay={0.24} />}
-            </motion.div>
+              {state.result.answer.neighbourhoods.length > 0 ? (
+                <Hoods names={state.result.answer.neighbourhoods} marks={hoodMarks} delay={0.24} />
+              ) : (
+                <div />
+              )}
+            </>
           )}
         </motion.article>
       </div>
