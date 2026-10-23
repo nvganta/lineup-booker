@@ -44,8 +44,13 @@ export const maxDuration = 60;
  */
 const FIRST_CHUNK_MS = 9_000;
 
+/** An API key, a Vercel deployment, or a pulled OIDC token (`vercel env pull`) all reach the gateway. */
 function hasGateway(): boolean {
-  return Boolean(process.env.AI_GATEWAY_API_KEY || process.env.VERCEL);
+  return Boolean(
+    process.env.AI_GATEWAY_API_KEY ||
+      process.env.VERCEL ||
+      process.env.VERCEL_OIDC_TOKEN,
+  );
 }
 
 async function finishAgentRun(
@@ -241,16 +246,20 @@ async function runLlmAgent(
       return;
     } catch (err) {
       lastError = streamError ?? err;
+      const lastModel = i === modelIds.length - 1;
       if (
         isGatewayRateLimitError(streamError) ||
         isGatewayRateLimitError(err)
       ) {
-        console.error(
-          "[agent] gateway rate limit — salvaging without rotation",
-        );
+        // Free models rate-limit per model, so the next one usually answers.
+        // Only when the chain is spent does the run salvage what it has.
+        if (!lastModel && !runtime.budget.pastSoftLimit()) {
+          console.error("[agent] model rate limited, rotating", modelId);
+          continue;
+        }
+        console.error("[agent] gateway rate limit, salvaging");
         return;
       }
-      const lastModel = i === modelIds.length - 1;
       if (
         !lastModel &&
         (isModelUnavailableError(streamError) || isModelUnavailableError(err))

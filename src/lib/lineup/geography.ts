@@ -327,11 +327,27 @@ function promotionBoroughFromGeocode(hit: GeocodeResult): string | undefined {
   );
 }
 
+/**
+ * Where a borough is a city of its own (NYC, London), a poster across the
+ * line is a poster in the wrong town. Elsewhere a Nominatim "borough" is a
+ * district (a Berlin Bezirk, a Paris arrondissement) and the next one over
+ * is two kilometres away, so the line means nothing for posters.
+ */
+export function boroughsDivideCity(pin: VenuePin): boolean {
+  if (nycCityLabel(pin.city)) return true;
+  if (boroughFromCounty(pin.county)) return true;
+  if (NYC_BOROUGHS.has(canonicalCityLabel(pin.borough ?? ""))) return true;
+  const state = pin.state?.trim().toLowerCase();
+  if (state === "new york" || state === "ny") return true;
+  return isLondonMetroVenue(pin);
+}
+
 export function samePromotableLocalityArea(
   pin: VenuePin,
   localityGeocode: GeocodeResult,
 ): boolean {
   if (!sameLocalityArea(pin, localityGeocode)) return false;
+  if (!boroughsDivideCity(pin)) return true;
   const venueBorough = promotionBoroughForPin(pin);
   const locBorough = promotionBoroughFromGeocode(localityGeocode);
   if (venueBorough && locBorough && venueBorough !== locBorough) {
@@ -346,6 +362,7 @@ export function sameBoroughAsPin(
   address: GeocodeResult["address"] | undefined,
 ): boolean {
   if (!address) return true;
+  if (!boroughsDivideCity(pin)) return true;
   const venueBorough = promotionBoroughForPin(pin);
   if (!venueBorough) return true;
   const cellBorough = promotionBoroughFromGeocode({
@@ -642,9 +659,14 @@ export function isNonPromotableNeighborhoodLabel(
     return true;
   }
   if (/\belectoral\b/i.test(disambiguation ?? "")) return true;
-  // The venue's own borough ("Brooklyn") is too broad to poster.
+  // The venue's own borough ("Brooklyn") is too broad to poster. A district
+  // elsewhere ("Neukölln") is the neighbourhood itself.
   const venueBorough = promotionBoroughForPin(pin);
-  if (venueBorough && normalizeBorough(name, pin.city) === venueBorough) {
+  if (
+    boroughsDivideCity(pin) &&
+    venueBorough &&
+    normalizeBorough(name, pin.city) === venueBorough
+  ) {
     return true;
   }
 

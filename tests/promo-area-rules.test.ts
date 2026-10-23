@@ -38,15 +38,34 @@ describe("promo area rules", () => {
 });
 
 describe("venue borough label", () => {
-  it("does not promote the venue's own borough as a neighbourhood", () => {
+  it("does not promote the venue's own borough where boroughs are towns", () => {
     const pin: VenuePin = {
       lat: 0,
       lon: 0,
-      city: "Fixtureton",
-      borough: "Fixture Borough",
+      city: "London",
+      borough: "Hackney",
     };
-    expect(isNonPromotableNeighborhoodLabel("Fixture Borough", pin)).toBe(true);
+    expect(isNonPromotableNeighborhoodLabel("Hackney", pin)).toBe(true);
     expect(isNonPromotableNeighborhoodLabel("Fixture Flats", pin)).toBe(false);
+  });
+
+  it("keeps the district and the next one over where boroughs are districts", () => {
+    const neukoelln: VenuePin = {
+      lat: 52.4839891,
+      lon: 13.439361,
+      city: "Berlin",
+      country: "Deutschland",
+      suburb: "Neukölln",
+      borough: "Neukölln",
+    };
+    expect(isNonPromotableNeighborhoodLabel("Neukölln", neukoelln)).toBe(false);
+    expect(
+      sameBoroughAsPin(neukoelln, {
+        suburb: "Kreuzberg",
+        borough: "Friedrichshain-Kreuzberg",
+        city: "Berlin",
+      }),
+    ).toBe(true);
   });
 });
 
