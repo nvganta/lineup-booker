@@ -85,10 +85,12 @@ export function LandingHero({
       <section className="mx-auto w-full max-w-[1400px] px-6 lg:px-12 pt-10 lg:pt-14 pb-8">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_0.95fr] gap-10 lg:gap-14 items-center">
           <div>
-            <h1 className="font-display text-[#1a1614] text-[clamp(2.6rem,5.2vw,4.4rem)] leading-[1.02] text-balance">
-              Your room has a vibe.
-              <br />
-              We&apos;ll find the artists who fit.
+            {/* Two lines, each kept whole; the size follows the column so the longer one never wraps. */}
+            <h1 className="font-display text-[#1a1614] text-[clamp(2rem,4.1vw,3.9rem)] leading-[1.05]">
+              <span className="block whitespace-nowrap">Your room has a vibe.</span>
+              <span className="block whitespace-nowrap">
+                We&apos;ll find the artists who fit.
+              </span>
             </h1>
             <p className="mt-5 max-w-lg text-[17px] leading-snug text-[#6b5c52]">
               Tell us about your venue, and we&apos;ll suggest the right
