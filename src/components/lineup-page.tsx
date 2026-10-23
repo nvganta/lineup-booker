@@ -38,6 +38,8 @@ import { upgradeQlooArtistImageUrl } from "@/lib/qloo-image-url";
 import { WithoutQlooView } from "@/components/without-qloo-view";
 import { BookingEmailCard, NightBriefCard } from "@/components/book-it-view";
 import { TrackPlayer } from "@/components/track-player";
+import { QlooTrail } from "@/components/qloo-trail";
+import { buildTrail } from "@/lib/qloo/trail";
 import { ENTER } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { Check, ExternalLink, MapPin } from "lucide-react";
@@ -520,6 +522,35 @@ export function LineupPage({
     openerDraw && `${openerDraw.label}: ${openerDraw.line}`,
   ].filter((s): s is string => Boolean(s));
 
+  const actNames = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const a of [
+      pitch.headliner,
+      pitch.opener,
+      ...pitch.alternates,
+      ...(pitch.openerSwapQueue ?? []),
+    ]) {
+      if (a) m.set(a.id, a.name);
+    }
+    for (const a of analytics?.acts ?? []) m.set(a.id, a.name);
+    return m;
+  }, [pitch, analytics]);
+  const trailNodes = useMemo(
+    () =>
+      buildTrail({
+        pitch,
+        analytics,
+        cityLabel: venueCity,
+        capacity,
+        tagLabels: styleTags,
+        crowdLine,
+        neighborhoodNames: pitch.neighborhoods
+          .slice(0, 5)
+          .map((n) => stripCityFromNeighborhoodLabel(n.name, venueCity)),
+      }),
+    [pitch, analytics, venueCity, capacity, styleTags, crowdLine],
+  );
+
   // The one line under the title says why these acts, not what the owner typed.
   const subtitle = [
     pitch.moodLine?.trim() ||
@@ -787,7 +818,7 @@ export function LineupPage({
           title="How we got here"
           sub="What a plain model guessed, what Qloo found, and every call behind it."
         />
-        <div className="space-y-4">
+        <div className="space-y-6">
           <WithoutQlooView
             pitch={pitch}
             venueCity={venueCity}
@@ -795,9 +826,28 @@ export function LineupPage({
             headlinerLine={headlinerWhyLine}
             openerLine={openerReachLine}
           />
-          <article className={CARD} data-tab-panel="data">
-            <LineupDataView pitch={pitch} analytics={analytics} />
-          </article>
+          <div>
+            <h3 className="font-display text-[22px] leading-tight text-[#1a1614]">
+              The trail
+            </h3>
+            <p className="mt-0.5 mb-3 text-[13px] text-[#6b5c52]">
+              Room to lineup, stop by stop. Each stop holds the Qloo requests
+              behind it.
+            </p>
+            <QlooTrail nodes={trailNodes} names={actNames} />
+          </div>
+          <details className="group">
+            <summary className="cursor-pointer list-none text-[13px] text-[#6b5c52] hover:text-[#8c4a32] transition-colors">
+              <span className="group-open:hidden">Show the charts</span>
+              <span className="hidden group-open:inline">Hide the charts</span>
+              <span className="ml-1.5 text-[11px] text-[#8a7f76]">
+                reach, opener overlap, venue tags, crowd skew
+              </span>
+            </summary>
+            <article className={cn(CARD, "mt-3")} data-tab-panel="data">
+              <LineupDataView pitch={pitch} analytics={analytics} />
+            </article>
+          </details>
         </div>
       </section>
     </div>
