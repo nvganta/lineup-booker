@@ -37,8 +37,9 @@ import { stripCityFromNeighborhoodLabel } from "@/lib/lineup/neighborhood-displa
 import { proxiedImageUrl } from "@/lib/image-proxy";
 import { upgradeQlooArtistImageUrl } from "@/lib/qloo-image-url";
 import { WithoutQlooView } from "@/components/without-qloo-view";
-import { BookItView } from "@/components/book-it-view";
-import { ENTER, fadeUp } from "@/lib/motion";
+import { BookingEmailCard, NightBriefCard } from "@/components/book-it-view";
+import { TrackPlayer } from "@/components/track-player";
+import { ENTER } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { Check, ExternalLink, MapPin } from "lucide-react";
 
@@ -136,7 +137,7 @@ type ActCardProps = {
   why: string[];
   blurb?: string | null;
   onBook: () => void;
-  bookLabel: string;
+  bookOpen: boolean;
 };
 
 function ActCard({
@@ -148,11 +149,10 @@ function ActCard({
   why,
   blurb,
   onBook,
-  bookLabel,
+  bookOpen,
 }: ActCardProps) {
   const photo = proxiedImageUrl(upgradeQlooArtistImageUrl(act.imageUrl));
   const [photoOk, setPhotoOk] = useState(Boolean(photo));
-  const listen = `https://open.spotify.com/search/${encodeURIComponent(act.name)}`;
   return (
     <article
       className={cn(CARD, "flex flex-col overflow-hidden")}
@@ -231,22 +231,34 @@ function ActCard({
             </ul>
           </div>
         )}
+        <div className="mt-4 border-t border-[#e8dfd6] pt-3">
+          <p className="text-[10.5px] font-medium uppercase tracking-[0.18em] text-[#8c4a32] mb-1">
+            Listen
+          </p>
+          <TrackPlayer artist={act.name} />
+        </div>
         <div className="mt-auto flex items-center justify-between gap-3 pt-4">
           <a
-            href={listen}
+            href={`https://open.spotify.com/search/${encodeURIComponent(act.name)}`}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1.5 text-[13px] text-[#6b5c52] hover:text-[#8c4a32] transition-colors"
+            className="inline-flex items-center gap-1.5 text-[12px] text-[#8a7f76] hover:text-[#8c4a32] transition-colors"
           >
-            <ExternalLink className="size-3.5" strokeWidth={2} />
-            Listen
+            <ExternalLink className="size-3" strokeWidth={2} />
+            More on Spotify
           </a>
           <Button
             type="button"
             onClick={onBook}
-            className="h-9 rounded-full bg-[#8c4a32] px-4 text-[13px] text-[#faf7f2] hover:bg-[#7a4030]"
+            aria-expanded={bookOpen}
+            className={cn(
+              "h-9 rounded-full px-4 text-[13px] transition-colors",
+              bookOpen
+                ? "bg-[#1a1614] text-[#faf7f2] hover:bg-[#2d2622]"
+                : "bg-[#8c4a32] text-[#faf7f2] hover:bg-[#7a4030]",
+            )}
           >
-            {bookLabel}
+            {bookOpen ? "Close" : `Book ${act.name.split(" ")[0]}`}
           </Button>
         </div>
       </div>
@@ -271,7 +283,10 @@ export function LineupPage({
     setPitch(initialPitch);
   }
   const [analyticsRev, setAnalyticsRev] = useState(0);
-  const [booking, setBooking] = useState(false);
+  // What is open under the cards: the night brief, or an email to one act.
+  const [booking, setBooking] = useState<
+    "night" | "headliner" | "opener" | null
+  >(null);
   const [active, setActive] =
     useState<(typeof SECTIONS)[number]["id"]>("lineup");
   const rootRef = useRef<HTMLDivElement>(null);
@@ -558,16 +573,17 @@ export function LineupPage({
           title="Here's your lineup."
           sub={subtitle}
           action={
-            !booking && (
-              <Button
-                type="button"
-                onClick={() => setBooking(true)}
-                className="rounded-full bg-[#1a1614] hover:bg-[#2d2622] text-[#faf7f2] text-sm"
-                data-book-it
-              >
-                Book it
-              </Button>
-            )
+            <Button
+              type="button"
+              onClick={() =>
+                setBooking((b) => (b === "night" ? null : "night"))
+              }
+              aria-expanded={booking === "night"}
+              className="rounded-full bg-[#1a1614] hover:bg-[#2d2622] text-[#faf7f2] text-sm"
+              data-book-it
+            >
+              {booking === "night" ? "Close" : "Book it"}
+            </Button>
           }
         />
 
@@ -620,16 +636,31 @@ export function LineupPage({
           </div>
         </div>
 
-        {booking ? (
-          <motion.div key="book" {...fadeUp} className="mt-6">
-            <BookItView
-              input={bookingInput}
-              insights={insightsState}
-              fileSlug={slugifyFilename(pitch.venueLabel)}
-              onBack={() => setBooking(false)}
-            />
-          </motion.div>
-        ) : (
+        {/* The night brief slides open under the venue card and stays there. */}
+        <AnimatePresence initial={false}>
+          {booking === "night" && (
+            <motion.div
+              key="night"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={ENTER}
+              className="overflow-hidden"
+            >
+              <NightBriefCard
+                className="mt-4"
+                input={bookingInput}
+                insights={insightsState}
+                fileSlug={slugifyFilename(pitch.venueLabel)}
+                when={when}
+                onEmail={(act) => setBooking(act)}
+                onClose={() => setBooking(null)}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {
           <>
             <div className="mt-8">
               <SectionHead
@@ -655,8 +686,10 @@ export function LineupPage({
                         city={venueCity}
                         tags={styleTags}
                         why={openerWhy}
-                        onBook={() => setBooking(true)}
-                        bookLabel="Book both"
+                        onBook={() =>
+                          setBooking((b) => (b === "opener" ? null : "opener"))
+                        }
+                        bookOpen={booking === "opener"}
                       />
                     </motion.div>
                   )}
@@ -669,11 +702,48 @@ export function LineupPage({
                     city={venueCity}
                     tags={styleTags}
                     why={headlinerWhy}
-                    onBook={() => setBooking(true)}
-                    bookLabel="Book both"
+                    onBook={() =>
+                      setBooking((b) =>
+                        b === "headliner" ? null : "headliner",
+                      )
+                    }
+                    bookOpen={booking === "headliner"}
                   />
                 </div>
               </div>
+              {/* The email to one act slides open under the cards. */}
+              <AnimatePresence initial={false}>
+                {(booking === "headliner" ||
+                  (booking === "opener" && pitch.opener)) && (
+                  <motion.div
+                    key={booking}
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={ENTER}
+                    className="overflow-hidden"
+                  >
+                    <BookingEmailCard
+                      className="mt-4"
+                      actLabel={
+                        booking === "opener"
+                          ? pitch.opener!.name
+                          : pitch.headliner.name
+                      }
+                      input={
+                        booking === "opener"
+                          ? {
+                              ...bookingInput,
+                              headliner: pitch.opener!.name,
+                              opener: null,
+                            }
+                          : bookingInput
+                      }
+                      onClose={() => setBooking(null)}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
               {otherOpeners.length > 0 && pitch.opener && (
                 <div className="mt-3 flex flex-wrap items-center gap-2 text-[12px] text-[#6b5c52]">
                   <span>Or open with</span>
@@ -729,15 +799,11 @@ export function LineupPage({
                               {why}
                             </p>
                           )}
-                          <a
-                            href={`https://open.spotify.com/search/${encodeURIComponent(a.name)}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="mt-1.5 inline-flex items-center gap-1 text-[11.5px] text-[#8c4a32] hover:underline"
-                          >
-                            <ExternalLink className="size-3" strokeWidth={2} />
-                            Listen
-                          </a>
+                          <TrackPlayer
+                            artist={a.name}
+                            compact
+                            className="mt-2"
+                          />
                         </div>
                       </li>
                     );
@@ -746,7 +812,7 @@ export function LineupPage({
               </div>
             )}
           </>
-        )}
+        }
       </motion.section>
 
       <section>

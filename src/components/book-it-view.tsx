@@ -5,7 +5,8 @@ import type { BookingEmail, BookingInput } from "@/lib/book/booking-email";
 import type { VenueInsightsState } from "@/hooks/use-venue-insights";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { DraftedBadge, POSTER_ARTICLE_CLASS, SectionLabel } from "@/components/venue-tab-parts";
+import { DraftedBadge, SectionLabel } from "@/components/venue-tab-parts";
+import { X } from "lucide-react";
 
 const memo = new Map<string, BookingEmail>();
 
@@ -30,19 +31,41 @@ function useBookingEmail(input: BookingInput) {
   return { email: memo.get(key) ?? null, failed: failedKey === key && !memo.has(key) };
 }
 
-type Props = {
-  input: BookingInput;
-  insights: VenueInsightsState;
-  fileSlug: string;
-  onBack: () => void;
-};
+const PANEL = "rounded-md border border-[#e8dfd6] bg-[#fcf9f5] text-[#1a1614]";
 
-export function BookItView({ input, insights, fileSlug, onBack }: Props) {
+function PanelHead({ label, badge, onClose }: { label: React.ReactNode; badge?: React.ReactNode; onClose: () => void }) {
+  return (
+    <div className="px-5 pt-3 pb-2 flex items-center justify-between gap-3 border-b border-[#e0d5ca]">
+      <SectionLabel className="mb-0">
+        {label}
+        {badge}
+      </SectionLabel>
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close"
+        className="rounded-full p-1 text-[#8a7f76] hover:text-[#1a1614] hover:bg-[#f0e8de] transition-colors cursor-pointer"
+      >
+        <X className="size-4" strokeWidth={2} />
+      </button>
+    </div>
+  );
+}
+
+/** The drafted enquiry to one act's booking contact. */
+export function BookingEmailCard({
+  input,
+  actLabel,
+  onClose,
+  className,
+}: {
+  input: BookingInput;
+  actLabel: string;
+  onClose: () => void;
+  className?: string;
+}) {
   const { email, failed } = useBookingEmail(input);
   const [copied, setCopied] = useState(false);
-  const copy = insights.status === "ready" && insights.copy.status === "ready" ? insights.copy.copy : null;
-  const copyPending = insights.status === "loading" || insights.status === "idle" || (insights.status === "ready" && insights.copy.status === "loading");
-  const title = input.opener ? `${input.headliner} with ${input.opener}` : input.headliner;
 
   const handleCopy = async () => {
     if (!email) return;
@@ -55,11 +78,69 @@ export function BookItView({ input, insights, fileSlug, onBack }: Props) {
     }
   };
 
+  const mailto = email
+    ? `mailto:?subject=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.body)}`
+    : undefined;
+
+  return (
+    <article className={cn(PANEL, className)} data-book="email">
+      <PanelHead
+        label={<>Email to {actLabel}</>}
+        badge={email && <DraftedBadge source={email.source} />}
+        onClose={onClose}
+      />
+      {email ? (
+        <div className="px-5 py-3">
+          <p className="font-heading text-[16px] leading-snug">{email.subject}</p>
+          <p className="mt-2 whitespace-pre-line text-[13px] leading-[1.55] text-[#3d3530]">{email.body}</p>
+          <div className="flex flex-wrap gap-2.5 mt-3.5">
+            <Button type="button" variant="outline" className="rounded-full border-[#e0d5ca] text-sm" onClick={handleCopy}>
+              {copied ? "Copied" : "Copy email"}
+            </Button>
+            <a href={mailto} className="inline-flex items-center rounded-full bg-[#8c4a32] px-4 h-9 text-sm text-[#faf7f2] hover:bg-[#7a4030]">
+              Open in mail
+            </a>
+          </div>
+          <p className="mt-3 text-[11px] text-[#8a7f76]">
+            Fill in [date], [offer] and [owner name] before it goes. Their booking contact is usually on their site or socials.
+          </p>
+        </div>
+      ) : (
+        <p className="px-5 py-6 text-[13px] italic text-[#8a7f76]" aria-busy={!failed}>
+          {failed ? "The email didn't draft this time." : "Drafting the email…"}
+        </p>
+      )}
+    </article>
+  );
+}
+
+/** The night on one page, for staff or print, with the PDF. */
+export function NightBriefCard({
+  input,
+  insights,
+  fileSlug,
+  when,
+  onEmail,
+  onClose,
+  className,
+}: {
+  input: BookingInput;
+  insights: VenueInsightsState;
+  fileSlug: string;
+  when?: string;
+  onEmail: (act: "headliner" | "opener") => void;
+  onClose: () => void;
+  className?: string;
+}) {
+  const copy = insights.status === "ready" && insights.copy.status === "ready" ? insights.copy.copy : null;
+  const copyPending = insights.status === "loading" || insights.status === "idle" || (insights.status === "ready" && insights.copy.status === "loading");
+  const title = input.opener ? `${input.headliner} with ${input.opener}` : input.headliner;
+
   const handlePdf = async () => {
     const { buildBriefPdf } = await import("@/lib/book/brief-pdf");
     const bytes = buildBriefPdf({
       title,
-      venueLine: `${input.venueLabel} · ${input.address}`,
+      venueLine: `${input.venueLabel} · ${input.address}${when ? ` · ${when}` : ""}`,
       neighborhoods: input.neighborhoods,
       ideas: (copy?.ideas ?? []).slice(0, 3).map((i) => ({ title: i.title, stat: i.basis, body: i.body })),
       posts: (copy?.captions ?? []).slice(0, 2),
@@ -73,70 +154,51 @@ export function BookItView({ input, insights, fileSlug, onBack }: Props) {
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   };
 
-  const mailto = email
-    ? `mailto:?subject=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.body)}`
-    : undefined;
-
   return (
-    <div className="space-y-3" data-book-view>
-      <button type="button" onClick={onBack} className="text-[12px] text-[#6b5c52] underline underline-offset-2 cursor-pointer">
-        Back to the lineup
-      </button>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 items-start">
-        <article className={cn(POSTER_ARTICLE_CLASS, "max-w-none")} data-book="email">
-          <div className="px-5 pt-3 pb-2 flex items-center justify-between gap-3 border-b border-[#e0d5ca]">
-            <SectionLabel>Email</SectionLabel>
-            {email && <DraftedBadge source={email.source} />}
-          </div>
-          {email ? (
-            <div className="px-5 py-3">
-              <p className="font-heading text-[17px] leading-snug">{email.subject}</p>
-              <p className="mt-2 whitespace-pre-line text-[13px] leading-[1.55] text-[#3d3530]">{email.body}</p>
-              <div className="flex flex-wrap gap-2.5 mt-3.5">
-                <Button type="button" variant="outline" className="rounded-full border-[#e0d5ca] text-sm" onClick={handleCopy}>
-                  {copied ? "Copied" : "Copy email"}
-                </Button>
-                <a href={mailto} className="inline-flex items-center rounded-full border border-[#e0d5ca] px-4 h-9 text-sm hover:bg-[#f0e8df]">
-                  Open in mail
-                </a>
-              </div>
-            </div>
+    <article className={cn(PANEL, className)} data-book="brief">
+      <PanelHead label="The night, on one page" badge={copy && <DraftedBadge source={copy.source} />} onClose={onClose} />
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-5 px-5 py-4">
+        <div className="min-w-0">
+          <p className="font-heading text-[19px] leading-tight">{title}</p>
+          <p className="text-[12px] text-[#6b5c52] mt-0.5">
+            {input.venueLabel}
+            {when ? ` · ${when}` : ""}
+          </p>
+          {input.neighborhoods.length > 0 && (
+            <p className="text-[12px] text-[#5c534d] mt-2">Posters: {input.neighborhoods.join(" · ")}</p>
+          )}
+          {copy ? (
+            <ul className="mt-2.5 space-y-1 list-none">
+              {copy.ideas.slice(0, 3).map((i) => (
+                <li key={i.title} className="text-[13px] leading-snug">
+                  <span className="font-medium">{i.title}</span>
+                  {i.basis && <span className="text-[#8c4a32] text-[12px]"> · {i.basis}</span>}
+                </li>
+              ))}
+            </ul>
           ) : (
-            <p className="px-5 py-6 text-[13px] italic text-[#8a7f76]" aria-busy={!failed}>
-              {failed ? "The email didn't draft this time." : "Drafting the email…"}
+            <p className="mt-2.5 text-[12px] italic text-[#8a7f76]" aria-busy={copyPending}>
+              {copyPending ? "Drafting specials and posts…" : "Specials weren't available."}
             </p>
           )}
-        </article>
-
-        <article className={cn(POSTER_ARTICLE_CLASS, "max-w-none")} data-book="brief">
-          <div className="px-5 pt-3 pb-2 flex items-center justify-between gap-3 border-b border-[#e0d5ca]">
-            <SectionLabel>Brief</SectionLabel>
-            {copy && <DraftedBadge source={copy.source} />}
-          </div>
-          <div className="px-5 py-3">
-            <p className="font-heading text-[19px] leading-tight">{title}</p>
-            <p className="text-[12px] text-[#6b5c52] mt-0.5">{input.venueLabel}</p>
-            {input.neighborhoods.length > 0 && (
-              <p className="text-[12px] text-[#5c534d] mt-2">{input.neighborhoods.join(" · ")}</p>
-            )}
-            {copy ? (
-              <ul className="mt-2.5 space-y-1 list-none">
-                {copy.ideas.slice(0, 3).map((i) => (
-                  <li key={i.title} className="text-[13px] leading-snug">
-                    <span className="font-heading">{i.title}</span>
-                    {i.basis && <span className="text-[#8c4a32] text-[12px]"> · {i.basis}</span>}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-2.5 text-[12px] italic text-[#8a7f76]" aria-busy={copyPending}>{copyPending ? "Drafting ideas and posts…" : "Ideas weren't available."}</p>
-            )}
-            <Button type="button" className="mt-3.5 rounded-full bg-[#8c4a32] hover:bg-[#7a3f2a] text-white text-sm" onClick={handlePdf} disabled={copyPending}>
-              Download brief (PDF)
+        </div>
+        <div className="flex flex-col gap-2 md:w-[220px]">
+          <Button type="button" className="rounded-full bg-[#8c4a32] hover:bg-[#7a3f2a] text-white text-sm" onClick={handlePdf} disabled={copyPending}>
+            Download brief (PDF)
+          </Button>
+          <Button type="button" variant="outline" className="rounded-full border-[#e0d5ca] text-sm" onClick={() => onEmail("headliner")}>
+            Email {input.headliner}
+          </Button>
+          {input.opener && (
+            <Button type="button" variant="outline" className="rounded-full border-[#e0d5ca] text-sm" onClick={() => onEmail("opener")}>
+              Email {input.opener}
             </Button>
-          </div>
-        </article>
+          )}
+          <p className="text-[11px] text-[#8a7f76] leading-snug">
+            Lock the headliner first; they set the date and the fee. Then the opener.
+          </p>
+        </div>
       </div>
-    </div>
+    </article>
   );
 }
