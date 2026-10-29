@@ -1,7 +1,7 @@
 "use client";
 
 import type { VenueInsightsState } from "@/hooks/use-venue-insights";
-import { sellCards, type SellCard } from "@/lib/venue/sell-cards";
+import { sellCards, share, type SellCard } from "@/lib/venue/sell-cards";
 import { cn } from "@/lib/utils";
 import {
   DraftedBadge,
@@ -50,7 +50,7 @@ function Card({ card, max, drafting }: { card: SellCard; max: number; drafting: 
         <p className="font-heading text-[18px] leading-[1.15]">{card.label}</p>
         <span
           className="shrink-0 rounded-full bg-[#8c4a32] px-2 py-[3px] text-[11px] font-medium leading-none text-[#faf7f2] tabular-nums"
-          title={`${card.fans} fan spots vs ${card.city} city spots`}
+          title="How much more often the fans' places have this than the city's"
         >
           {card.lift}
         </span>
@@ -163,21 +163,23 @@ export function FoodDealsView({ state, headlinerName, cityLabel }: Props) {
                   <span className="truncate">{r.label}</span>
                   <PairBars fans={r.fans} city={r.city} max={max} />
                   <span className="text-right tabular-nums text-[#5c534d] whitespace-nowrap">
-                    {r.fans} <span className="text-[#a0958b]">vs</span> {r.city}
+                    {share(r.fans, food.fanSample)}%{" "}
+                    <span className="text-[#a0958b]">vs</span>{" "}
+                    {share(r.city, food.citySample)}%
                   </span>
                 </div>
               ))}
             </div>
           )}
           <SourceNote className="mt-3">
-            Counts of tagged places among Qloo&apos;s top {food.fanSample} restaurants and bars for {headlinerName} fans, and the top {food.citySample} for {city}.
+            From the {food.fanSample} restaurants and bars Qloo ranks highest for {headlinerName} fans, against the top {food.citySample} for {city}.
           </SourceNote>
         </TabSection>
       )}
       {rest.length === 0 && food.status === "ok" && (
         <TabSection last>
           <SourceNote>
-            Counts of tagged places among Qloo&apos;s top {food.fanSample} restaurants and bars for {headlinerName} fans, and the top {food.citySample} for {city}.
+            From the {food.fanSample} restaurants and bars Qloo ranks highest for {headlinerName} fans, against the top {food.citySample} for {city}.
           </SourceNote>
         </TabSection>
       )}

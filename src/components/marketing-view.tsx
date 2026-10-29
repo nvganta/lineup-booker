@@ -19,8 +19,11 @@ import {
   TabSection,
 } from "@/components/venue-tab-parts";
 import { toPng } from "html-to-image";
+import { Download, Maximize2, X } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import dynamic from "next/dynamic";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ENTER } from "@/lib/motion";
 
 const LineupMap = dynamic(
   () => import("@/components/lineup-map").then((m) => m.LineupMap),
@@ -42,6 +45,74 @@ type Props = {
   /** The owner's date line, if they gave one; seeds the poster. */
   defaultWhen?: string;
 };
+
+/** The poster at full height over a dimmed page; Escape or a click outside closes it. */
+function PosterLightbox({
+  open,
+  onClose,
+  onDownload,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onDownload: () => void;
+  children: React.ReactNode;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          key="poster-full"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={ENTER}
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-[#1a1614]/85 p-4 sm:p-8 backdrop-blur-sm"
+          onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Poster"
+          data-poster-full
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.97 }}
+            transition={ENTER}
+            className="w-[min(88vw,calc((100dvh-9rem)*0.8))] overflow-hidden rounded-md shadow-[0_40px_80px_-30px_rgba(0,0,0,0.7)] [container-type:inline-size]"
+          >
+            {children}
+          </motion.div>
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={onDownload}
+              className="inline-flex h-10 items-center gap-2 rounded-full bg-[#faf7f2] px-5 text-[14px] text-[#1a1614] hover:bg-white transition-colors cursor-pointer"
+            >
+              <Download className="size-4" strokeWidth={2} />
+              Download poster
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="inline-flex size-10 items-center justify-center rounded-full border border-[#faf7f2]/30 text-[#faf7f2] hover:bg-[#faf7f2]/10 transition-colors cursor-pointer"
+            >
+              <X className="size-4" strokeWidth={2} />
+            </button>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -66,6 +137,7 @@ function CopyButton({ text }: { text: string }) {
 
 export function MarketingView({ state, pitch, venue, cityLabel, street, leadWith, defaultWhen }: Props) {
   const [when, setWhen] = useState(defaultWhen ?? "");
+  const [full, setFull] = useState(false);
   const posterRef = useRef<HTMLDivElement>(null);
 
   const handleDownload = useCallback(async () => {
@@ -180,7 +252,13 @@ export function MarketingView({ state, pitch, venue, cityLabel, street, leadWith
         </SectionLabel>
         <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-5 items-start">
           <div>
-            <div className="rounded-md overflow-hidden border border-[#e0d5ca] [container-type:inline-size]">
+            <button
+              type="button"
+              onClick={() => setFull(true)}
+              aria-label="View the poster full screen"
+              className="group relative block w-full rounded-md overflow-hidden border border-[#e0d5ca] [container-type:inline-size] cursor-zoom-in"
+              data-poster-open
+            >
               <ShowPoster
                 ref={posterRef}
                 headliner={pitch.headliner}
@@ -189,7 +267,24 @@ export function MarketingView({ state, pitch, venue, cityLabel, street, leadWith
                 address={street || pitch.address}
                 when={when}
               />
-            </div>
+              <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-[#1a1614]/70 px-2 py-1 text-[10.5px] text-[#faf7f2] opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                <Maximize2 className="size-3" strokeWidth={2} />
+                Full screen
+              </span>
+            </button>
+            <PosterLightbox
+              open={full}
+              onClose={() => setFull(false)}
+              onDownload={handleDownload}
+            >
+              <ShowPoster
+                headliner={pitch.headliner}
+                opener={pitch.opener?.name ?? null}
+                venueLabel={venueDisplayName(pitch.venueLabel)}
+                address={street || pitch.address}
+                when={when}
+              />
+            </PosterLightbox>
             <input
               value={when}
               onChange={(e) => setWhen(e.target.value)}

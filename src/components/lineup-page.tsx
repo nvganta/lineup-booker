@@ -842,7 +842,7 @@ export function LineupPage({
               <span className="group-open:hidden">Show the charts</span>
               <span className="hidden group-open:inline">Hide the charts</span>
               <span className="ml-1.5 text-[11px] text-[#8a7f76]">
-                reach, opener overlap, venue tags, crowd skew
+                room fit, who comes, why the two acts work together
               </span>
             </summary>
             <article className={cn(CARD, "mt-3")} data-tab-panel="data">

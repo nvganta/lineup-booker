@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { liftLabel, sellCards } from "@/lib/venue/sell-cards";
+import { liftLabel, sellCards, sellLine } from "@/lib/venue/sell-cards";
 
 describe("liftLabel", () => {
   it("reads as a multiple when the gap is wide, a count when it is not", () => {
@@ -29,13 +29,26 @@ describe("sellCards", () => {
     expect(top.map((t) => t.label)).toEqual(["Late night", "Burgers", "Pub"]);
     expect(top[0]).toMatchObject({
       lift: "2×",
-      line: "10 of Fixture Act fans' top 15 spots are open late. 5 of Testville's top 15 do.",
+      line: "67% of the places Fixture Act fans go most stay open late. Only 33% of Testville's top spots do.",
     });
     expect(top[0]?.idea?.title).toBe("Keep the kitchen open late");
     expect(top[1]?.line).toContain("serve burgers");
     expect(top[1]?.idea).toBeNull();
     expect(top[1]?.fallback).toBe("Put burgers on special that night.");
-    expect(top[2]?.line).toContain("are a pub");
+    expect(top[2]?.line).toContain("are pubs");
     expect(rest.map((r) => r.label)).toEqual(["Craft beer", "Gluten free"]);
+  });
+});
+
+describe("sellLine", () => {
+  it("speaks in shares of places, never a bare count of fans", () => {
+    const line = sellLine({ label: "Cocktail bar", kind: "drink", fans: 10, city: 3 }, "Fixture Act", "Testville", 15, 15);
+    expect(line).toBe("67% of the places Fixture Act fans go most are cocktail bars. Only 20% of Testville's top spots are.");
+    expect(sellLine({ label: "Spirits", kind: "drink", fans: 13, city: 8 }, "A", "B", 15, 15)).toBe(
+      "87% of the places A fans go most pour spirits. 53% of B's top spots do.",
+    );
+    expect(sellLine({ label: "Brewery", kind: "drink", fans: 4, city: 0 }, "A", "B", 15, 15)).toContain(
+      "are breweries. Almost none of B's top spots are.",
+    );
   });
 });
