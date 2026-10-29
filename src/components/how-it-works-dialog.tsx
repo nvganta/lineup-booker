@@ -104,13 +104,10 @@ export function HowItWorksDialog({ open, onClose }: Props) {
               <X className="size-4" strokeWidth={2} />
             </button>
 
-            <header className="px-6 sm:px-10 pt-8 pb-6 border-b border-[#e8dfd6]">
-              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8c4a32]">
-                How it works
-              </p>
+            <header className="px-6 sm:px-10 pt-9 pb-6 border-b border-[#e8dfd6]">
               <h2
                 id="how-it-works-title"
-                className="mt-2 font-display text-[clamp(1.9rem,4vw,2.6rem)] leading-[1.05] text-[#1a1614]"
+                className="pr-8 font-display text-[clamp(1.9rem,4vw,2.6rem)] leading-[1.05] text-[#1a1614]"
               >
                 Three lines in. A night ready to host out.
               </h2>
@@ -130,25 +127,23 @@ export function HowItWorksDialog({ open, onClose }: Props) {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ ...ENTER, delay: 0.06 + i * 0.05 }}
-                    className="bg-[#faf7f2] px-6 py-6"
+                    className="relative isolate overflow-hidden bg-[#faf7f2] px-6 pt-7 pb-8 min-h-[11rem]"
                   >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={cn(
-                          "flex size-10 items-center justify-center rounded-full",
-                          step.you ? "bg-[#1a1614] text-[#faf7f2]" : "bg-[#8c4a32]/10 text-[#8c4a32]",
-                        )}
-                      >
-                        <Icon className="size-[18px]" strokeWidth={1.75} />
-                      </span>
-                      <span className="font-display text-[15px] text-[#8c4a32] tabular-nums">
-                        {String(i + 1).padStart(2, "0")}
-                      </span>
-                    </div>
-                    <p className="mt-3.5 font-heading text-[17px] leading-tight text-[#1a1614]">
+                    {/* The step's picture, large and faint behind the words. */}
+                    <Icon
+                      aria-hidden
+                      strokeWidth={1}
+                      className={cn(
+                        "pointer-events-none absolute -right-5 -bottom-6 -z-10 size-40",
+                        step.you ? "text-[#1a1614]/[0.07]" : "text-[#8c4a32]/[0.09]",
+                      )}
+                    />
+                    <p className="font-heading text-[18px] leading-tight text-[#1a1614]">
                       {step.title}
                     </p>
-                    <p className="mt-1.5 text-[13px] leading-[1.5] text-[#5c534d]">{step.body}</p>
+                    <p className="mt-2 max-w-[17rem] text-[13px] leading-[1.55] text-[#5c534d]">
+                      {step.body}
+                    </p>
                   </motion.li>
                 );
               })}
