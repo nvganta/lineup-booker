@@ -15,17 +15,17 @@ You type three lines: what your place is, its address, and what your regulars lo
 
 Who to book. A headliner sized to your room, with a plain reason ("#2 of 9 acts in the pool for indie folk fans near Vancouver"), a draw read from Qloo's popularity scale ("Big draw, 83rd percentile for listener reach, likely fills a 300-cap room"), and a local opener whose fans overlap with the headliner's. Every act plays 30-second previews in place, so you hear it next to the reason it fits. Alternates sit under "More options". Each act has its own Book button that drafts the enquiry email to that act, because that is how booking actually works, one conversation per act.
 
-What to sell. Qloo's place data for the headliner's fans against the city's, turned into three specials: "10 of Jordan Klassen fans' top 15 spots are open late. 5 of Vancouver's top 15 do." Under each, the deal the agent drafted for that night.
+What to sell. Qloo's place data for the headliner's fans against the city's, turned into three specials: "87% of the places Will Heard fans go most stay open late. Only 33% of London's top spots do." Under each, the deal the agent drafted for that night.
 
 Where to promote. The fan heatmap for the headliner, ranked by neighbourhood within 5 km, on a map. Flyer spots the fans already go to within 1.5 km. A poster, built from the lineup with a date line you fill in, ready to download. Captions, ready to copy.
 
-How we got here. The same room through a plain model with no Qloo, side by side with the Qloo answer, checked line by line (the plain model's headliner was from the wrong city). Then the trail: room to lineup, stop by stop, with the exact Qloo request behind every stop one hover away.
+How we got here. The same room through a plain model with no Qloo, side by side with the Qloo answer, checked line by line (the plain model's headliner was from the wrong city). Then the trail: room to lineup, stop by stop, with the exact Qloo request behind every stop one hover away. Under it, two charts an owner can read at a glance: where every act sits on Qloo's reach scale against the band that fits the room, and who comes by age against the city's average listener.
 
 ## Why it is Qloo-powered, not LLM-powered
 
 The agent cannot name an artist, a neighbourhood or a number on its own. Every pick comes from a Qloo call, and the code validates the pitch against what Qloo returned before it is shown. If the model stalls, the run finishes from Qloo data alone. That is the design: cultural intelligence is the engine, the model is the writer.
 
-A single night uses around twelve Qloo requests across six endpoints:
+A single night uses about fourteen Qloo requests:
 
 Tags: the owner's words become Qloo taste tags (`/v2/tags`, semantic search).
 Headliner pool: artists by tag near the venue pin, with a popularity band derived from the room's capacity (`/v2/insights`, `urn:entity:artist`, `signal.location`, `filter.popularity`).
