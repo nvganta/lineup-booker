@@ -38,6 +38,12 @@ yarn-error.log*
 lineup-booker-shots/
 .cache/
 
+# devpost submission material, kept local
+/docs/submission.md
+/docs/devpost-story.md
+/docs/thumbnail.png
+/docs/gallery/
+
 # vercel
 .vercel
 
