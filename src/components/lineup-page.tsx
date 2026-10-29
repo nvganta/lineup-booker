@@ -479,23 +479,37 @@ export function LineupPage({
   useEffect(() => {
     const root = rootRef.current;
     if (!root || !onActiveSection) return;
-    const heads = PAGE_SECTIONS.map((s) =>
-      root.querySelector<HTMLElement>(`#${s.id}`),
-    ).filter((el): el is HTMLElement => Boolean(el));
-    const scroller = root.closest<HTMLElement>("[data-result-feed]");
-    const io = new IntersectionObserver(
-      (entries) => {
-        const hit = entries
-          .filter((e) => e.isIntersecting)
-          .sort(
-            (a, b) => a.boundingClientRect.top - b.boundingClientRect.top,
-          )[0];
-        if (hit) onActiveSection(hit.target.id);
-      },
-      { root: scroller, rootMargin: "-10% 0px -70% 0px", threshold: 0 },
+    // Desktop scrolls the result pane; phones scroll the window.
+    const feed = root.closest<HTMLElement>("[data-result-feed]");
+    const paneScrolls = Boolean(
+      feed && /(auto|scroll)/.test(getComputedStyle(feed).overflowY),
     );
-    heads.forEach((h) => io.observe(h));
-    return () => io.disconnect();
+    const target: HTMLElement | Window = paneScrolls && feed ? feed : window;
+    // The lit section is the last heading that has passed a line a third of
+    // the way down the view, so a jump that parks a heading at the top counts.
+    const update = () => {
+      const box =
+        paneScrolls && feed
+          ? feed.getBoundingClientRect()
+          : { top: 0, height: window.innerHeight };
+      const line = box.top + box.height / 3;
+      let current: string = PAGE_SECTIONS[0].id;
+      for (const s of PAGE_SECTIONS) {
+        const el = root.querySelector<HTMLElement>(`#${s.id}`);
+        if (el && el.getBoundingClientRect().top <= line) current = s.id;
+      }
+      // At the very bottom the last heading may never reach the line.
+      const atEnd =
+        paneScrolls && feed
+          ? feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 4
+          : window.scrollY + window.innerHeight >=
+            document.documentElement.scrollHeight - 4;
+      if (atEnd) current = PAGE_SECTIONS[PAGE_SECTIONS.length - 1].id;
+      onActiveSection(current);
+    };
+    update();
+    target.addEventListener("scroll", update, { passive: true });
+    return () => target.removeEventListener("scroll", update);
   }, [booking, onActiveSection]);
 
   const qlooCallCount =
