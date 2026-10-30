@@ -44,10 +44,11 @@ export async function POST(req: Request) {
   }
   const b = parsed.data;
   const ups = b.rows.filter((r) => r.fans > r.city && r.kind !== "diet").length;
+  const nearby = b.nearEatDrink.length >= 2 ? 1 : 0;
+  // Fans who don't out-index the city on anything still go somewhere near
+  // the room; that tie-in is the one special the data supports.
   const ideaCount =
-    b.rows.length >= 2 && ups > 0
-      ? Math.min(ups, 2) + (b.nearEatDrink.length >= 2 ? 1 : 0)
-      : 0;
+    b.rows.length >= 2 && ups > 0 ? Math.min(ups, 2) + nearby : nearby;
   const copy = await draftVenueCopy(
     {
       headliner: b.headliner,
