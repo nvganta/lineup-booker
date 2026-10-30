@@ -1,4 +1,4 @@
-import { createGatewayProvider } from "@ai-sdk/gateway";
+import { languageModel } from "@/lib/agent/language-model";
 import { generateText } from "ai";
 import { z } from "zod";
 import { agentModelChain } from "@/lib/agent/model";
@@ -41,11 +41,10 @@ export async function POST(req: Request) {
   const hit = await store.get<BookingEmail>(k);
   if (hit) return Response.json(hit);
 
-  const gateway = createGatewayProvider({ apiKey: process.env.AI_GATEWAY_API_KEY });
   for (const modelId of (await agentModelChain()).slice(0, 2)) {
     try {
       const { text } = await generateText({
-        model: gateway(modelId),
+        model: languageModel(modelId),
         maxRetries: 0,
         temperature: 0.3,
         abortSignal: AbortSignal.timeout(25_000),

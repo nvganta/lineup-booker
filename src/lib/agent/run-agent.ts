@@ -1,4 +1,4 @@
-import { createGatewayProvider } from "@ai-sdk/gateway";
+import { languageModel } from "@/lib/agent/language-model";
 import {
   createUIMessageStream,
   createUIMessageStreamResponse,
@@ -142,11 +142,8 @@ function streamAgentText(
   runtime: AgentRuntime,
   onStreamError: (error: unknown) => void,
 ) {
-  const gateway = createGatewayProvider({
-    apiKey: process.env.AI_GATEWAY_API_KEY,
-  });
   return streamText({
-    model: gateway(modelId),
+    model: languageModel(modelId),
     maxRetries: 0,
     timeout: { firstChunkMs: FIRST_CHUNK_MS },
     // The real gateway error (rate limit, unavailable) only arrives here;

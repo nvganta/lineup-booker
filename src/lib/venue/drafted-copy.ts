@@ -1,4 +1,4 @@
-import { createGatewayProvider } from "@ai-sdk/gateway";
+import { languageModel } from "@/lib/agent/language-model";
 import { generateText } from "ai";
 import { agentModelChain } from "@/lib/agent/model";
 import { getPersistentStore } from "@/lib/cache/persistent-store";
@@ -334,12 +334,11 @@ export async function draftVenueCopy(
   if (hit) return hit;
 
   const modelIds = (await agentModelChain()).slice(0, 2);
-  const gateway = createGatewayProvider({ apiKey: process.env.AI_GATEWAY_API_KEY });
   const prompt = promptFor(input, ideaCount);
   for (const [i, modelId] of modelIds.entries()) {
     try {
       const { text } = await generateText({
-        model: gateway(modelId),
+        model: languageModel(modelId),
         maxRetries: 0,
         temperature: 0.3,
         abortSignal: AbortSignal.timeout(MODEL_TIMEOUTS_MS[i] ?? 20_000),
