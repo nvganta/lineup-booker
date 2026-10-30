@@ -66,6 +66,14 @@ function sampleRunFor(
     : null;
 }
 
+const WIDE = "(min-width: 1024px)";
+function subscribeWide(onChange: () => void) {
+  const mq = window.matchMedia(WIDE);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}
+const readWide = () => window.matchMedia(WIDE).matches;
+
 export function HomePageClient() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -79,6 +87,9 @@ export function HomePageClient() {
   );
   const [sampleRuns, setSampleRuns] = useState<SampleRuns>({});
   const [savedRun, setSavedRun] = useState<SampleRun | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Below lg the details stack above the lineup and can't collapse.
+  const isWide = useSyncExternalStore(subscribeWide, readWide, () => true);
   const [savedPitch, setSavedPitch] = useState<PitchPayload | null>(null);
   // Bumped per example click, so the same room replays its scout each time.
   const [replayNonce, setReplayNonce] = useState(0);
@@ -247,6 +258,11 @@ export function HomePageClient() {
           sections={shownPitch && !loading ? [...PAGE_SECTIONS] : []}
           activeSection={activeSection}
           onJump={jumpToSection}
+          sidebar={
+            showLanding
+              ? undefined
+              : { open: sidebarOpen, onToggle: () => setSidebarOpen((o) => !o) }
+          }
         />
         <HowItWorksDialog open={howOpen} onClose={() => setHowOpen(false)} />
 
@@ -266,47 +282,59 @@ export function HomePageClient() {
           <>
             <div className="relative z-10 flex flex-col lg:flex-row flex-1 min-h-0 max-lg:overflow-visible">
               <div className="flex flex-col lg:flex-row flex-1 min-h-0 max-lg:overflow-visible">
-                <div className="shrink-0 w-full lg:w-[20rem] xl:w-[22rem] lg:border-r border-[#e8dfd6] bg-[#faf7f2]/95 lg:overflow-y-auto lg:overscroll-contain px-4 py-5 lg:px-5">
-                  {showSummary ? (
-                    <VenueSummary
-                      request={form}
-                      audience={audience}
-                      onEdit={() => setEditing(true)}
-                      disabled={loading}
-                    />
-                  ) : (
-                    <LineupForm
-                      value={form}
-                      onChange={setForm}
-                      onSubmit={(data) => {
-                        setEditing(false);
-                        void handleSubmit(data);
-                      }}
-                      loading={loading}
-                      addressError={addressError}
-                    />
+                {/* Collapses to nothing from the header toggle; the inner column
+                    keeps its width so the text is clipped, not squeezed, as it slides. */}
+                <div
+                  className={cn(
+                    "shrink-0 w-full lg:overflow-hidden lg:transition-[width,border-color] lg:duration-300 lg:ease-[cubic-bezier(0.23,1,0.32,1)] lg:border-r border-[#e8dfd6] bg-[#faf7f2]/95",
+                    sidebarOpen
+                      ? "lg:w-[20rem] xl:w-[22rem]"
+                      : "lg:w-0 lg:border-transparent",
                   )}
-                  <div className="mt-6 pt-4 border-t border-[#e8dfd6]">
-                    <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8a7f76] mb-2">
-                      Examples
-                    </p>
-                    <ul className="list-none space-y-1">
-                      {EXAMPLE_VENUES.map((ex) => (
-                        <li key={ex.label}>
-                          <button
-                            type="button"
-                            disabled={loading}
-                            onClick={() => selectRequest(ex.request)}
-                            className={cn(
-                              "text-sm text-[#6b5c52] hover:text-[#8c4a32] disabled:opacity-50 transition-colors",
-                            )}
-                          >
-                            {ex.label}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                    <RecentLineups {...railProps} />
+                  inert={!sidebarOpen && isWide ? true : undefined}
+                >
+                  <div className="w-full lg:w-[20rem] xl:w-[22rem] lg:h-full lg:overflow-y-auto lg:overscroll-contain px-4 py-5 lg:px-5">
+                    {showSummary ? (
+                      <VenueSummary
+                        request={form}
+                        audience={audience}
+                        onEdit={() => setEditing(true)}
+                        disabled={loading}
+                      />
+                    ) : (
+                      <LineupForm
+                        value={form}
+                        onChange={setForm}
+                        onSubmit={(data) => {
+                          setEditing(false);
+                          void handleSubmit(data);
+                        }}
+                        loading={loading}
+                        addressError={addressError}
+                      />
+                    )}
+                    <div className="mt-6 pt-4 border-t border-[#e8dfd6]">
+                      <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8a7f76] mb-2">
+                        Examples
+                      </p>
+                      <ul className="list-none space-y-1">
+                        {EXAMPLE_VENUES.map((ex) => (
+                          <li key={ex.label}>
+                            <button
+                              type="button"
+                              disabled={loading}
+                              onClick={() => selectRequest(ex.request)}
+                              className={cn(
+                                "text-sm text-[#6b5c52] hover:text-[#8c4a32] disabled:opacity-50 transition-colors",
+                              )}
+                            >
+                              {ex.label}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                      <RecentLineups {...railProps} />
+                    </div>
                   </div>
                 </div>
 
