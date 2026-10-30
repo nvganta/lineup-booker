@@ -120,7 +120,7 @@ export function TrackPlayer({ artist, compact, className }: Props) {
 
   if (compact) {
     return (
-      <div ref={rowRef} className={cn("flex items-center gap-1.5", className)} data-previews="compact">
+      <div ref={rowRef} className={cn("flex min-w-0 flex-wrap items-center gap-1.5", className)} data-previews="compact">
         {tracks.slice(0, 2).map((t) => {
           const on = nowId === t.id && playing;
           return (
@@ -131,7 +131,7 @@ export function TrackPlayer({ artist, compact, className }: Props) {
               title={t.title}
               aria-label={`${on ? "Pause" : "Play"} ${t.title}`}
               className={cn(
-                "inline-flex h-6 items-center gap-1 rounded-full border px-1.5 text-[10.5px] max-w-[9rem] cursor-pointer transition-colors",
+                "inline-flex h-6 min-w-0 max-w-full items-center gap-1 rounded-full border px-1.5 text-[10.5px] cursor-pointer transition-colors",
                 on ? "border-[#8c4a32] bg-[#8c4a32] text-[#faf7f2]" : "border-[#e0d5ca] bg-[#fcf9f5] text-[#3d3530] hover:border-[#8c4a32]/40",
               )}
             >

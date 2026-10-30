@@ -8,7 +8,7 @@ export const FREE_MODEL_CHAIN = [
   "poolside/laguna-s-2.1-free",
 ];
 
-/** Primary agent model (override with AGENT_MODEL). */
+/** Primary agent model (override with AGENT_MODEL; the one model allowed to be paid). */
 export function agentModelId(): string {
   return process.env.AGENT_MODEL?.trim() || FREE_MODEL_CHAIN[0]!;
 }
@@ -27,7 +27,7 @@ type GatewayModel = { id: string; type?: string; pricing?: { input?: string; out
 
 const MODELS_URL = "https://ai-gateway.vercel.sh/v1/models";
 const LIST_TTL_MS = 10 * 60 * 1000;
-let listCache: { at: number; free: Set<string> } | null = null;
+let listCache: { at: number; listed: Set<string>; free: Set<string> } | null = null;
 
 /** Ids the gateway lists as language models with a zero input and output price. */
 export function freeLanguageModels(list: GatewayModel[]): Set<string> {
@@ -49,8 +49,9 @@ export function candidateModelIds(): string[] {
 }
 
 /**
- * The models to try, in order. A model the gateway no longer lists, or one
- * that isn't free, is dropped up front so a retired id costs no request.
+ * The models to try, in order. A model the gateway no longer lists is dropped
+ * up front so a retired id costs no request. AGENT_MODEL may be paid, since it
+ * is set on purpose; every model behind it must be free, so a fallback never bills.
  * If the list can't be read, the candidates are tried as they are and the
  * caller's rotation skips any that fail.
  */
@@ -61,11 +62,18 @@ export async function agentModelChain(fetchImpl: typeof fetch = fetch): Promise<
       const res = await fetchImpl(MODELS_URL, { signal: AbortSignal.timeout(3000) });
       if (!res.ok) throw new Error(`models ${res.status}`);
       const body = (await res.json()) as { data?: GatewayModel[] };
-      listCache = { at: Date.now(), free: freeLanguageModels(body.data ?? []) };
+      const data = body.data ?? [];
+      listCache = {
+        at: Date.now(),
+        listed: new Set(data.map((m) => m.id)),
+        free: freeLanguageModels(data),
+      };
     }
-    const free = listCache.free;
-    const chain = candidates.filter((m) => free.has(m));
-    const dropped = candidates.filter((m) => !free.has(m));
+    const { listed, free } = listCache;
+    const primary = process.env.AGENT_MODEL?.trim();
+    const allowed = (m: string) => free.has(m) || (m === primary && listed.has(m));
+    const chain = candidates.filter(allowed);
+    const dropped = candidates.filter((m) => !allowed(m));
     if (dropped.length > 0) console.warn(`[model] skipped unlisted or paid: ${dropped.join(", ")}`);
     return chain.length > 0 ? chain : FREE_MODEL_CHAIN.slice();
   } catch {

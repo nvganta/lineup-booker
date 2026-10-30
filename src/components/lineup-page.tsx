@@ -68,6 +68,16 @@ export const PAGE_SECTIONS = [
 const CARD =
   "rounded-md border border-[#e8dfd6] bg-[#f7f2eb] text-[#1a1614] shadow-[0_1px_0_rgba(26,22,20,0.06),0_20px_40px_-24px_rgba(26,22,20,0.18)]";
 
+/** Later sections arrive one after another once the scout hands over the page. */
+function settleIn(on: boolean | undefined, order: number) {
+  if (!on) return {};
+  return {
+    initial: { opacity: 0, y: 12 },
+    animate: { opacity: 1, y: 0 },
+    transition: { ...ENTER, duration: 0.5, delay: 0.12 * order },
+  };
+}
+
 function cityHintFromAddress(address: string): string | undefined {
   const parts = address
     .split(",")
@@ -766,7 +776,7 @@ export function LineupPage({
                           rounded="md"
                           className="h-14 w-14 text-base shrink-0"
                         />
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <p className="text-[13.5px] font-medium leading-tight line-clamp-2">
                             {a.name}
                           </p>
@@ -791,7 +801,7 @@ export function LineupPage({
         }
       </motion.section>
 
-      <section>
+      <motion.section {...settleIn(animateSettle, 1)}>
         <SectionHead
           id="sell"
           title="What to put on special"
@@ -808,9 +818,9 @@ export function LineupPage({
             ""
           }
         />
-      </section>
+      </motion.section>
 
-      <section>
+      <motion.section {...settleIn(animateSettle, 2)}>
         <SectionHead
           id="promote"
           title="Where to promote"
@@ -825,9 +835,9 @@ export function LineupPage({
           leadWith={leadWith}
           defaultWhen={when}
         />
-      </section>
+      </motion.section>
 
-      <section>
+      <motion.section {...settleIn(animateSettle, 3)}>
         <SectionHead
           id="how"
           title="How we got here"
@@ -864,7 +874,7 @@ export function LineupPage({
             </article>
           </details>
         </div>
-      </section>
+      </motion.section>
     </div>
   );
 }

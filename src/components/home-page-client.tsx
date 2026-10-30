@@ -83,6 +83,8 @@ export function HomePageClient() {
   const [sampleRuns, setSampleRuns] = useState<SampleRuns>({});
   const [savedRun, setSavedRun] = useState<SampleRun | null>(null);
   const [savedPitch, setSavedPitch] = useState<PitchPayload | null>(null);
+  // Bumped per example click, so the same room replays its scout each time.
+  const [replayNonce, setReplayNonce] = useState(0);
   const [howOpen, setHowOpen] = useState(false);
   // The left column plays the request back once a lineup is up; Edit details reopens the form.
   const [editing, setEditing] = useState(false);
@@ -130,6 +132,7 @@ export function HomePageClient() {
     setAddressError(null);
     setSavedRun(run);
     setSavedPitch(run?.pitch ?? null);
+    setReplayNonce((n) => n + 1);
     setAgentState(null);
     setError(null);
     // No saved run for this room: scout it live, so the click always shows something.
@@ -320,6 +323,7 @@ export function HomePageClient() {
                   form={form}
                   savedPitch={savedPitch}
                   savedVenue={savedRun?.venue}
+                  replayKey={savedRun ? replayNonce : null}
                   onAudience={setAudience}
                   onActiveSection={setActiveSection}
                   scrollRef={resultFeedRef}

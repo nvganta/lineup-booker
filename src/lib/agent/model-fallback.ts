@@ -19,12 +19,12 @@ export function isModelUnavailableError(error: unknown): boolean {
   if (isGatewayRateLimitError(error)) return true;
   const msg = String(error instanceof Error ? error.message : error).toLowerCase();
   return (
-    /unavailable|not found|does not exist|model.*denied|access denied|free tier|quota|overloaded|503|502|404/.test(
+    /unavailable|not found|does not exist|model.*denied|access denied|free tier|quota|overloaded|insufficient|funds|credit|payment required|402|503|502|404/.test(
       msg,
     ) ||
     (error instanceof Error &&
       "statusCode" in error &&
-      [403, 404, 503].includes(Number((error as { statusCode?: number }).statusCode)))
+      [402, 403, 404, 503].includes(Number((error as { statusCode?: number }).statusCode)))
   );
 }
 

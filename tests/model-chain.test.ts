@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { agentModelChain, FREE_MODEL_CHAIN, freeLanguageModels, resetModelListCache } from "@/lib/agent/model";
+import { isModelUnavailableError } from "@/lib/agent/model-fallback";
 
 const list = {
   data: [
@@ -30,6 +31,18 @@ describe("model chain", () => {
     vi.stubEnv("AGENT_FALLBACK_MODELS", "acme/paid-model");
     vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(await agentModelChain(fakeFetch(list))).toEqual(FREE_MODEL_CHAIN);
+  });
+
+  it("keeps a paid primary model, with only free models behind it", async () => {
+    vi.stubEnv("AGENT_MODEL", "acme/paid-model");
+    vi.stubEnv("AGENT_FALLBACK_MODELS", "nvidia/nemotron-3.5-lightning-free");
+    expect(await agentModelChain(fakeFetch(list))).toEqual(["acme/paid-model", ...FREE_MODEL_CHAIN]);
+  });
+
+  it("rotates past a model the account can't pay for", () => {
+    const outOfCredit = Object.assign(new Error("Insufficient funds. Add credits to continue."), { statusCode: 402 });
+    expect(isModelUnavailableError(outOfCredit)).toBe(true);
+    expect(isModelUnavailableError(new Error("payment required"))).toBe(true);
   });
 
   it("reads the list once while cached", async () => {
