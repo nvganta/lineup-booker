@@ -18,7 +18,7 @@ const STEPS: Array<[BookingStatus, string]> = [
   ["confirmed", "Confirmed"],
 ];
 
-function ActRow({
+export function ActRow({
   role,
   name,
   status,
@@ -29,7 +29,8 @@ function ActRow({
   name: string;
   status: BookingStatus;
   onStatus: (s: BookingStatus) => void;
-  onEmail: () => void;
+  /** Left out where the email is already on screen. */
+  onEmail?: () => void;
 }) {
   return (
     <li
@@ -45,11 +46,11 @@ function ActRow({
           {name}
         </p>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 max-sm:w-full">
         <div
           role="radiogroup"
           aria-label={`Where booking ${name} stands`}
-          className="inline-flex rounded-full border border-[#e0d5ca] bg-[#f3ece4]/70 p-0.5"
+          className="inline-flex rounded-full border border-[#e0d5ca] bg-[#f3ece4]/70 p-0.5 max-sm:w-full"
         >
           {STEPS.map(([value, label]) => {
             const on = status === value;
@@ -61,7 +62,7 @@ function ActRow({
                 aria-checked={on}
                 onClick={() => onStatus(value)}
                 className={cn(
-                  "rounded-full px-3 h-7 text-[12px] transition-colors cursor-pointer",
+                  "whitespace-nowrap rounded-full px-3 h-7 text-[12px] transition-colors cursor-pointer max-sm:flex-1 max-sm:px-2",
                   on
                     ? value === "confirmed"
                       ? "bg-[#8c4a32] text-[#faf7f2]"
@@ -74,13 +75,15 @@ function ActRow({
             );
           })}
         </div>
-        <button
-          type="button"
-          onClick={onEmail}
-          className="rounded-full border border-[#e0d5ca] bg-[#fcf9f5] px-3 h-7 text-[12px] text-[#3d3530] hover:border-[#8c4a32]/40 hover:text-[#8c4a32] transition-colors cursor-pointer"
-        >
-          Email {name.split(" ")[0]}
-        </button>
+        {onEmail && (
+          <button
+            type="button"
+            onClick={onEmail}
+            className="rounded-full border border-[#e0d5ca] bg-[#fcf9f5] px-3 h-7 text-[12px] text-[#3d3530] hover:border-[#8c4a32]/40 hover:text-[#8c4a32] transition-colors cursor-pointer"
+          >
+            Email {name.split(" ")[0]}
+          </button>
+        )}
       </div>
     </li>
   );

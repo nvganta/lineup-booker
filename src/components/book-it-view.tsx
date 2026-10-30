@@ -61,22 +61,25 @@ function PanelHead({
 }: {
   label: React.ReactNode;
   badge?: React.ReactNode;
-  onClose: () => void;
+  /** Left out inside the booking room, whose own close covers it. */
+  onClose?: () => void;
 }) {
   return (
-    <div className="px-5 pt-3 pb-2 flex items-center justify-between gap-3 border-b border-[#e0d5ca]">
+    <div className="px-5 pt-3 pb-2 flex items-center justify-between gap-3 border-b border-[#e0d5ca] min-h-[2.75rem]">
       <SectionLabel className="mb-0">
         {label}
         {badge}
       </SectionLabel>
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label="Close"
-        className="rounded-full p-1 text-[#8a7f76] hover:text-[#1a1614] hover:bg-[#f0e8de] transition-colors cursor-pointer"
-      >
-        <X className="size-4" strokeWidth={2} />
-      </button>
+      {onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="rounded-full p-1 text-[#8a7f76] hover:text-[#1a1614] hover:bg-[#f0e8de] transition-colors cursor-pointer"
+        >
+          <X className="size-4" strokeWidth={2} />
+        </button>
+      )}
     </div>
   );
 }
@@ -93,7 +96,7 @@ export function BookingEmailCard({
   actLabel: string;
   /** MusicBrainz id from the act's background, when the card has one. */
   mbid?: string;
-  onClose: () => void;
+  onClose?: () => void;
   className?: string;
 }) {
   const { email, failed } = useBookingEmail(input);
@@ -227,7 +230,7 @@ export function NightBriefCard({
   fileSlug: string;
   when?: string;
   onEmail: (act: "headliner" | "opener") => void;
-  onClose: () => void;
+  onClose?: () => void;
   className?: string;
 }) {
   const copy =

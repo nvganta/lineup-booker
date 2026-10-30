@@ -36,7 +36,7 @@ import { stripCityFromNeighborhoodLabel } from "@/lib/lineup/neighborhood-displa
 import { proxiedImageUrl } from "@/lib/image-proxy";
 import { upgradeQlooArtistImageUrl } from "@/lib/qloo-image-url";
 import { WithoutQlooView } from "@/components/without-qloo-view";
-import { BookingEmailCard, NightBriefCard } from "@/components/book-it-view";
+import { BookingRoom, type RoomTab } from "@/components/booking-room";
 import { TrackPlayer } from "@/components/track-player";
 import { QlooTrail } from "@/components/qloo-trail";
 import { buildTrail } from "@/lib/qloo/trail";
@@ -159,7 +159,6 @@ type ActCardProps = {
   why: string[];
   blurb?: string | null;
   onBook: () => void;
-  bookOpen: boolean;
 };
 
 function ActCard({
@@ -171,7 +170,6 @@ function ActCard({
   why,
   blurb,
   onBook,
-  bookOpen,
 }: ActCardProps) {
   const photo = proxiedImageUrl(upgradeQlooArtistImageUrl(act.imageUrl));
   const [photoOk, setPhotoOk] = useState(Boolean(photo));
@@ -272,15 +270,10 @@ function ActCard({
           <Button
             type="button"
             onClick={onBook}
-            aria-expanded={bookOpen}
-            className={cn(
-              "h-9 rounded-full px-4 text-[13px] transition-colors",
-              bookOpen
-                ? "bg-[#1a1614] text-[#faf7f2] hover:bg-[#2d2622]"
-                : "bg-[#8c4a32] text-[#faf7f2] hover:bg-[#7a4030]",
-            )}
+            aria-haspopup="dialog"
+            className="h-9 rounded-full px-4 text-[13px] bg-[#8c4a32] text-[#faf7f2] hover:bg-[#7a4030] transition-colors"
           >
-            {bookOpen ? "Close" : `Book ${act.name.split(" ")[0]}`}
+            {`Book ${act.name.split(" ")[0]}`}
           </Button>
         </div>
       </div>
@@ -306,22 +299,9 @@ export function LineupPage({
     setPitch(initialPitch);
   }
   const [analyticsRev, setAnalyticsRev] = useState(0);
-  // What is open under the cards: the night brief, or an email to one act.
-  const [booking, setBooking] = useState<
-    "night" | "headliner" | "opener" | null
-  >(null);
+  // The booking room's open tab; null while the lineup is in front.
+  const [booking, setBooking] = useState<RoomTab | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  // An email opens under the act cards, a screen below the brief that asks
-  // for it; bring it into view so the click visibly goes somewhere.
-  useEffect(() => {
-    if (booking !== "headliner" && booking !== "opener") return;
-    const t = setTimeout(() => {
-      rootRef.current
-        ?.querySelector("[data-book=email]")
-        ?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 120);
-    return () => clearTimeout(t);
-  }, [booking]);
   const analyticsInput = analyticsInputFromPitch(pitch);
   const analyticsState = usePitchAnalytics(analyticsInput, analyticsRev);
   const analytics =
@@ -636,42 +616,16 @@ export function LineupPage({
               )}
               <Button
                 type="button"
-                onClick={() =>
-                  setBooking((b) => (b === "night" ? null : "night"))
-                }
-                aria-expanded={booking === "night"}
+                onClick={() => setBooking("night")}
+                aria-haspopup="dialog"
                 className="h-9 rounded-full bg-[#1a1614] px-5 text-[13px] text-[#faf7f2] shadow-[0_1px_2px_rgba(26,22,20,0.25)] hover:bg-[#2d2622] transition-colors"
                 data-book-it
               >
-                {booking === "night" ? "Close" : "Book it"}
+                Book it
               </Button>
             </div>
           }
         />
-
-        {/* The night brief slides open under the title and stays there. */}
-        <AnimatePresence initial={false}>
-          {booking === "night" && (
-            <motion.div
-              key="night"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={ENTER}
-              className="overflow-hidden"
-            >
-              <NightBriefCard
-                className="mt-4"
-                input={bookingInput}
-                insights={insightsState}
-                fileSlug={slugifyFilename(pitch.venueLabel)}
-                when={when}
-                onEmail={(act) => setBooking(act)}
-                onClose={() => setBooking(null)}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {
           <>
@@ -694,10 +648,7 @@ export function LineupPage({
                         city={venueCity}
                         tags={styleTags}
                         why={openerWhy}
-                        onBook={() =>
-                          setBooking((b) => (b === "opener" ? null : "opener"))
-                        }
-                        bookOpen={booking === "opener"}
+                        onBook={() => setBooking("opener")}
                       />
                     </motion.div>
                   )}
@@ -710,54 +661,10 @@ export function LineupPage({
                     city={venueCity}
                     tags={styleTags}
                     why={headlinerWhy}
-                    onBook={() =>
-                      setBooking((b) =>
-                        b === "headliner" ? null : "headliner",
-                      )
-                    }
-                    bookOpen={booking === "headliner"}
+                    onBook={() => setBooking("headliner")}
                   />
                 </div>
               </div>
-              {/* The email to one act slides open under the cards. */}
-              <AnimatePresence initial={false}>
-                {(booking === "headliner" ||
-                  (booking === "opener" && pitch.opener)) && (
-                  <motion.div
-                    key={booking}
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={ENTER}
-                    className="overflow-hidden"
-                  >
-                    <BookingEmailCard
-                      className="mt-4"
-                      actLabel={
-                        booking === "opener"
-                          ? pitch.opener!.name
-                          : pitch.headliner.name
-                      }
-                      mbid={musicBrainzId(
-                        booking === "opener"
-                          ? pitch.opener?.background
-                          : pitch.headliner.background,
-                      )}
-                      input={
-                        booking === "opener"
-                          ? {
-                              ...bookingInput,
-                              headliner: pitch.opener!.name,
-                              opener: null,
-                              openFor: pitch.headliner.name,
-                            }
-                          : bookingInput
-                      }
-                      onClose={() => setBooking(null)}
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
               {otherOpeners.length > 0 && pitch.opener && (
                 <div className="mt-3 flex flex-wrap items-center gap-2 text-[12px] text-[#6b5c52]">
                   <span>Or open with</span>
@@ -903,6 +810,30 @@ export function LineupPage({
           </details>
         </div>
       </motion.section>
+
+      <BookingRoom
+        tab={booking}
+        onTab={setBooking}
+        onClose={() => setBooking(null)}
+        pitch={pitch}
+        input={bookingInput}
+        insights={insightsState}
+        when={when}
+        fileSlug={slugifyFilename(pitch.venueLabel)}
+        headlinerMbid={musicBrainzId(pitch.headliner.background)}
+        openerMbid={musicBrainzId(pitch.opener?.background)}
+        promote={
+          <MarketingView
+            state={insightsState}
+            pitch={pitch}
+            venue={venue}
+            cityLabel={insightsInput?.cityLabel ?? venueCity ?? ""}
+            street={street}
+            leadWith={leadWith}
+            defaultWhen={when}
+          />
+        }
+      />
     </div>
   );
 }
