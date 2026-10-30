@@ -25,7 +25,9 @@ export function AppShellTopBar({
   onJump,
 }: Props) {
   return (
-    <header className="shrink-0 grid grid-cols-[1fr_auto_1fr] items-center gap-4 border-b border-[#e8dfd6] bg-[#faf7f2]/95 backdrop-blur-sm px-4 lg:px-6 h-14 z-20">
+    // From xl the first column matches the 22rem sidebar, so the section nav
+    // centres over the lineup it scrolls rather than over the whole window.
+    <header className="shrink-0 grid grid-cols-[1fr_auto_1fr] xl:grid-cols-[calc(22rem-1rem)_1fr_auto_1fr] items-center gap-4 border-b border-[#e8dfd6] bg-[#faf7f2]/95 backdrop-blur-sm px-4 lg:px-6 h-14 z-20">
       <button
         type="button"
         onClick={onHome}
@@ -39,7 +41,7 @@ export function AppShellTopBar({
       <nav
         aria-label="Sections"
         className={cn(
-          "flex min-w-0 max-w-full items-center gap-0.5 overflow-x-auto rounded-full border border-[#e8dfd6] bg-[#f3ece4]/80 p-1",
+          "xl:col-start-3 flex min-w-0 max-w-full items-center gap-0.5 overflow-x-auto rounded-full border border-[#e8dfd6] bg-[#f3ece4]/80 p-1",
           sections.length === 0 && "invisible",
         )}
       >
@@ -74,7 +76,7 @@ export function AppShellTopBar({
       <button
         type="button"
         onClick={onHowItWorks}
-        className="justify-self-end inline-flex items-center gap-1.5 rounded-full border border-[#e0d5ca] bg-[#fcf9f5] px-3.5 py-1.5 text-[13px] leading-none text-[#5c534d] hover:text-[#8c4a32] hover:border-[#8c4a32]/40 transition-colors cursor-pointer"
+        className="justify-self-end xl:col-start-4 inline-flex items-center gap-1.5 rounded-full border border-[#e0d5ca] bg-[#fcf9f5] px-3.5 py-1.5 text-[13px] leading-none text-[#5c534d] hover:text-[#8c4a32] hover:border-[#8c4a32]/40 transition-colors cursor-pointer"
       >
         <CircleHelp className="size-3.5" strokeWidth={2} />
         How it works
