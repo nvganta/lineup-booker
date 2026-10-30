@@ -133,6 +133,9 @@ export type NominatimAddress = {
   quarter?: string;
   road?: string;
   house_number?: string;
+  /** e.g. "US-TX", "CA-BC". */
+  "ISO3166-2-lvl4"?: string;
+  country_code?: string;
 };
 
 export type GeocodeResult = {
@@ -377,10 +380,46 @@ export function scoreGeocodeResult(
   return score - rank * 2;
 }
 
+const COUNTRY_ALIASES: Record<string, string> = {
+  uk: "gb",
+  england: "gb",
+  scotland: "gb",
+  wales: "gb",
+  usa: "us",
+  "u.s.": "us",
+  "u.s.a.": "us",
+  "united states": "us",
+};
+
+/**
+ * The state, province or country the owner typed last ("TX", "BC", "UK"), or
+ * undefined when the address doesn't end in one.
+ */
+export function typedRegion(typedAddress: string): string | undefined {
+  return parseAddressForGeocode(typedAddress).country?.toLowerCase();
+}
+
+/**
+ * A hit in another state or country than the one typed. Nominatim will match
+ * "1001 Lenoir St, Austin" to Austin Lane in Lenoir County, North Carolina.
+ */
+export function isOutsideTypedRegion(hit: GeocodeResult, region: string | undefined): boolean {
+  if (!region) return false;
+  const addr = hit.address ?? {};
+  const sub = addr["ISO3166-2-lvl4"]?.split("-")[1]?.toLowerCase();
+  const cc = addr.country_code?.toLowerCase();
+  if (sub === region || cc === region || cc === COUNTRY_ALIASES[region]) return false;
+  if ([addr.state, addr.country].some((v) => v?.toLowerCase() === region)) return false;
+  const word = new RegExp(`(^|[^\\p{L}])${region.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^\\p{L}]|$)`, "iu");
+  return !word.test(hit.displayName);
+}
+
 export function pickBestGeocodeResult(
-  candidates: GeocodeResult[],
+  allCandidates: GeocodeResult[],
   typedAddress: string,
 ): GeocodeResult | null {
+  const region = typedRegion(typedAddress);
+  const candidates = allCandidates.filter((c) => !isOutsideTypedRegion(c, region));
   if (candidates.length === 0) return null;
   const parsed = parseAddressForGeocode(typedAddress);
   const hints = neighborhoodHintsFromLocation(typedAddress);
@@ -515,7 +554,8 @@ async function nominatimFetchCandidates(
   query: string,
   limit: number,
 ): Promise<GeocodeResult[]> {
-  const key = `q:${query.trim().toLowerCase()}:n${limit}`;
+  // v2: hits carry the ISO region code the region check reads.
+  const key = `q2:${query.trim().toLowerCase()}:n${limit}`;
   const { value } = await nominatimRequestMany({ q: query }, key, limit);
   return value ?? [];
 }
@@ -658,7 +698,16 @@ export async function geocodeWithRetries(
       city: parsed.city,
       country: parsed.country,
     });
-    if (structured) return structured;
+    if (structured && !isOutsideTypedRegion(structured, typedRegion(address))) return structured;
+  }
+
+  // No such street on the map: the city itself beats a street in the wrong state.
+  const place = stripTrailingPostcodeToken(address).split(",").slice(1).join(",").trim();
+  if (place) {
+    const region = typedRegion(address);
+    const hits = await nominatimFetchCandidates(place, 3);
+    const city = hits.find((h) => !isOutsideTypedRegion(h, region));
+    if (city) return city;
   }
 
   return null;
