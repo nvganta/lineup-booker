@@ -33,6 +33,7 @@ describe("booking email checks", () => {
     ["an invented placeholder", ok.replace("Hello,", "Hello [venue name],")],
     ["a merged row", ok + "\nThe crowd loves late-night burgers."],
     ["a guessed pronoun", ok.replace("We can offer", "His fans live nearby. We can offer")],
+    ["a lowercased name", ok + "\nthe paper gulls would suit the room."],
   ])("rejects %s", (_, body) => {
     expect(bookingProblems("Booking enquiry", body, input).length).toBeGreaterThan(0);
   });

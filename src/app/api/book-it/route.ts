@@ -36,7 +36,7 @@ export async function POST(req: Request) {
   const raw = JSON.stringify({ input, v: 1 });
   let h = 0;
   for (let i = 0; i < raw.length; i++) h = (h * 31 + raw.charCodeAt(i)) | 0;
-  const k = `book-it:v3:${(h >>> 0).toString(36)}:${raw.length}`;
+  const k = `book-it:v4:${(h >>> 0).toString(36)}:${raw.length}`;
   const store = getPersistentStore();
   const hit = await store.get<BookingEmail>(k);
   if (hit) return Response.json(hit);

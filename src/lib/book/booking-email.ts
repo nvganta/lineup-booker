@@ -60,6 +60,13 @@ export function bookingProblems(subject: string, body: string, i: BookingInput):
   if (/!|#\w/.test(text)) p.push("exclamation or hashtag");
   // We don't know an act's pronouns; a guessed one misgenders a real person.
   if (/\b(he|she|him|his|her|hers)\b/i.test(text)) p.push("gendered pronoun");
+  // Names go out exactly as the act writes them; "pearl charles" reads careless.
+  if (!text.includes(i.headliner)) p.push("headliner not named");
+  for (const name of [i.headliner, i.opener, i.openFor]) {
+    if (!name) continue;
+    const seen = text.match(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi")) ?? [];
+    if (seen.some((s) => s !== name)) p.push(`miscased ${name}`);
+  }
   for (const ph of PLACEHOLDERS) if (!body.includes(ph)) p.push(`missing ${ph}`);
   for (const t of text.match(/\[[^\]]*\]/g) ?? []) {
     if (!(PLACEHOLDERS as readonly string[]).includes(t)) p.push(`unknown placeholder ${t}`);
