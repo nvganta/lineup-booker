@@ -19,7 +19,11 @@ export function useActReach(name: string, mbid?: string): ActReach | undefined {
     fetch(`/api/act-links?${q}`)
       .then((r) => (r.ok ? r.json() : {}))
       .then((j: Partial<ActReach>) => {
-        reachMemo.set(key, { links: j.links ?? [], emails: j.emails ?? [], contactPage: j.contactPage });
+        reachMemo.set(key, {
+          links: j.links ?? [],
+          emails: j.emails ?? [],
+          contactPage: j.contactPage,
+        });
         if (live) bump((n) => n + 1);
       })
       .catch(() => {
@@ -76,12 +80,22 @@ const EMAIL_TITLE: Record<ContactEmail["kind"], string> = {
   general: "Email them",
 };
 
-function Step({ title, detail, children }: { title: string; detail?: React.ReactNode; children: React.ReactNode }) {
+function Step({
+  title,
+  detail,
+  children,
+}: {
+  title: string;
+  detail?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <li className="flex flex-col gap-1.5 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
       <div className="min-w-0">
         <p className="text-[13px] font-medium text-[#1a1614]">{title}</p>
-        {detail && <p className="text-[11.5px] text-[#8a7f76] break-words">{detail}</p>}
+        {detail && (
+          <p className="text-[11.5px] text-[#8a7f76] break-words">{detail}</p>
+        )}
       </div>
       <div className="flex shrink-0 flex-wrap gap-1.5">{children}</div>
     </li>
@@ -103,23 +117,32 @@ export function ReachMap({
   input,
   email,
   reach,
+  onSend,
 }: {
   actLabel: string;
   input: BookingInput;
   email: BookingEmail;
   reach: ActReach;
+  /** An email to the act was opened. */
+  onSend?: () => void;
 }) {
   const [copied, copy] = useCopy();
   const dm = dmText(input);
   const instagram = reach.links.find((l) => l.label === "Instagram");
   const facebook = reach.links.find((l) => l.label === "Facebook");
   const also = reach.links.filter((l) => l !== instagram && l !== facebook);
-  const nothing = reach.emails.length === 0 && !reach.contactPage && reach.links.length === 0;
+  const nothing =
+    reach.emails.length === 0 && !reach.contactPage && reach.links.length === 0;
   const search = `https://www.google.com/search?q=${encodeURIComponent(`"${actLabel}" booking contact`)}`;
 
   return (
-    <div className="mt-4 border-t border-[#e8dfd6] pt-3" data-reach={nothing ? "search" : "found"}>
-      <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#8a7f76]">How to reach {actLabel}</p>
+    <div
+      className="mt-4 border-t border-[#e8dfd6] pt-3"
+      data-reach={nothing ? "search" : "found"}
+    >
+      <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#8a7f76]">
+        How to reach {actLabel}
+      </p>
       <ol className="mt-1 list-none divide-y divide-[#efe7dd]">
         {reach.emails.map((e) => (
           <Step
@@ -128,7 +151,12 @@ export function ReachMap({
             detail={
               <>
                 {e.address} · listed on{" "}
-                <a href={e.source} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[#8c4a32]">
+                <a
+                  href={e.source}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2 hover:text-[#8c4a32]"
+                >
                   their site
                 </a>
               </>
@@ -136,7 +164,11 @@ export function ReachMap({
           >
             <a
               href={mailtoFor(e.address, email)}
-              className={cn(CHIP, "border-[#8c4a32] bg-[#8c4a32] text-[#faf7f2] hover:bg-[#7a4030] hover:text-[#faf7f2]")}
+              onClick={onSend}
+              className={cn(
+                CHIP,
+                "border-[#8c4a32] bg-[#8c4a32] text-[#faf7f2] hover:bg-[#7a4030] hover:text-[#faf7f2]",
+              )}
               data-reach-email
             >
               Open in mail
@@ -144,12 +176,18 @@ export function ReachMap({
           </Step>
         ))}
         {reach.contactPage && (
-          <Step title="Use the contact page on their site" detail="Paste the email above into their form.">
+          <Step
+            title="Use the contact page on their site"
+            detail="Paste the email above into their form."
+          >
             <Out href={reach.contactPage}>Contact page</Out>
           </Step>
         )}
         {instagram && (
-          <Step title="Send a DM on Instagram" detail="Plenty of acts answer DMs before email. Use the short version below.">
+          <Step
+            title="Send a DM on Instagram"
+            detail="Plenty of acts answer DMs before email. Use the short version below."
+          >
             <Out href={instagram.url}>Instagram</Out>
           </Step>
         )}
@@ -168,7 +206,10 @@ export function ReachMap({
           </Step>
         )}
         {nothing && (
-          <Step title="Search for their booking contact" detail={`MusicBrainz doesn't list ${actLabel}'s links yet, so this searches for them.`}>
+          <Step
+            title="Search for their booking contact"
+            detail={`MusicBrainz doesn't list ${actLabel}'s links yet, so this searches for them.`}
+          >
             <Out href={search}>Search</Out>
           </Step>
         )}
@@ -176,17 +217,27 @@ export function ReachMap({
       {(instagram || facebook || nothing) && (
         <div className="mt-2 rounded-md bg-[#f3ece4] px-3 py-2.5">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#8a7f76]">Short version for DMs</p>
-            <button type="button" onClick={() => copy("dm", dm)} className={CHIP}>
+            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#8a7f76]">
+              Short version for DMs
+            </p>
+            <button
+              type="button"
+              onClick={() => copy("dm", dm)}
+              className={CHIP}
+            >
               {copied === "dm" ? "Copied" : "Copy DM"}
             </button>
           </div>
-          <p className="mt-1.5 text-[12.5px] leading-snug text-[#3d3530]">{dm}</p>
+          <p className="mt-1.5 text-[12.5px] leading-snug text-[#3d3530]">
+            {dm}
+          </p>
         </div>
       )}
       <p className="mt-2 text-[11px] text-[#8a7f76]">
-        {reach.emails.length > 0 || reach.contactPage ? `From MusicBrainz and ${actLabel}'s own site.` : "From MusicBrainz."} Nothing
-        is sent from here; it goes from your own inbox and accounts.
+        {reach.emails.length > 0 || reach.contactPage
+          ? `From MusicBrainz and ${actLabel}'s own site.`
+          : "From MusicBrainz."}{" "}
+        Nothing is sent from here; it goes from your own inbox and accounts.
       </p>
     </div>
   );

@@ -12,16 +12,20 @@ export type ShowPosterProps = {
   address: string;
   /** "Fri 14 Nov · 8 PM", or empty for the placeholder. */
   when: string;
+  /** The small line top right; "Live" unless the owner writes their own. */
+  tagline?: string;
   className?: string;
 };
 
 /** A 4:5 poster the owner can post as is: photo, headliner, opener, room, date. */
 export const ShowPoster = forwardRef<HTMLDivElement, ShowPosterProps>(
   function ShowPoster(
-    { headliner, opener, venueLabel, address, when, className },
+    { headliner, opener, venueLabel, address, when, tagline, className },
     ref,
   ) {
-    const photo = proxiedImageUrl(upgradeQlooArtistImageUrl(headliner.imageUrl));
+    const photo = proxiedImageUrl(
+      upgradeQlooArtistImageUrl(headliner.imageUrl),
+    );
     return (
       <div
         ref={ref}
@@ -49,13 +53,19 @@ export const ShowPoster = forwardRef<HTMLDivElement, ShowPosterProps>(
           aria-hidden
         />
         <div className="absolute inset-x-0 top-0 flex items-start justify-between p-[6%] text-[2.6cqw]">
-          <p className="uppercase tracking-[0.2em] opacity-90">{venueLabel}</p>
-          <p className="uppercase tracking-[0.2em] opacity-90">Live</p>
+          <p className="uppercase tracking-[0.2em] opacity-90 max-w-[50%]">
+            {venueLabel}
+          </p>
+          <p className="uppercase tracking-[0.2em] opacity-90 text-right max-w-[45%]">
+            {tagline?.trim() || "Live"}
+          </p>
         </div>
         <div className="absolute inset-x-0 bottom-0 p-[7%]">
           <p
             className="font-display leading-[0.95] text-balance"
-            style={{ fontSize: headliner.name.length > 16 ? "9.5cqw" : "12cqw" }}
+            style={{
+              fontSize: headliner.name.length > 16 ? "9.5cqw" : "12cqw",
+            }}
           >
             {headliner.name}
           </p>

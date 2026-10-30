@@ -13,6 +13,8 @@ import {
   useCopy,
 } from "@/components/reach-map";
 import { BookingProgress, BriefProgress } from "@/components/booking-progress";
+import { BookingTracker } from "@/components/booking-tracker";
+import { bookingKey, markEnquirySent } from "@/lib/book/booking-status";
 import { EASE_OUT } from "@/lib/motion";
 import { X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -99,6 +101,7 @@ export function BookingEmailCard({
   const [copied, copy] = useCopy();
   // The best address we found goes straight into the To field.
   const to = reach?.emails[0]?.address;
+  const statusKey = bookingKey(input.address, actLabel);
   const ready = Boolean((email || failed) && reach);
   // Already looked up (opened before): straight to the email.
   const [working, setWorking] = useState(!ready);
@@ -166,6 +169,7 @@ export function BookingEmailCard({
                   </Button>
                   <a
                     href={mailtoFor(to ?? "", email)}
+                    onClick={() => markEnquirySent(statusKey)}
                     className="inline-flex items-center rounded-full bg-[#8c4a32] px-4 h-9 text-sm text-[#faf7f2] hover:bg-[#7a4030]"
                   >
                     Open in mail
@@ -176,6 +180,7 @@ export function BookingEmailCard({
                 </p>
                 {reach ? (
                   <ReachMap
+                    onSend={() => markEnquirySent(statusKey)}
                     actLabel={actLabel}
                     input={input}
                     email={email}
@@ -296,76 +301,58 @@ export function NightBriefCard({
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, ease: EASE_OUT }}
-            className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-5 px-5 py-4"
           >
-            <div className="min-w-0">
-              <p className="font-heading text-[19px] leading-tight">{title}</p>
-              <p className="text-[12px] text-[#6b5c52] mt-0.5">
-                {input.venueLabel}
-                {when ? ` · ${when}` : ""}
-              </p>
-              {input.neighborhoods.length > 0 && (
-                <p className="text-[12px] text-[#5c534d] mt-2">
-                  Posters: {input.neighborhoods.join(" · ")}
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-5 px-5 py-4">
+              <div className="min-w-0">
+                <p className="font-heading text-[19px] leading-tight">
+                  {title}
                 </p>
-              )}
-              {copy ? (
-                <ul className="mt-2.5 space-y-1 list-none">
-                  {copy.ideas.slice(0, 3).map((i) => (
-                    <li key={i.title} className="text-[13px] leading-snug">
-                      <span className="font-medium">{i.title}</span>
-                      {i.basis && (
-                        <span className="text-[#8c4a32] text-[12px]">
-                          {" "}
-                          · {i.basis}
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p
-                  className="mt-2.5 text-[12px] italic text-[#8a7f76]"
-                  aria-busy={copyPending}
-                >
-                  {copyPending
-                    ? "Drafting specials and posts…"
-                    : "Specials weren't available."}
+                <p className="text-[12px] text-[#6b5c52] mt-0.5">
+                  {input.venueLabel}
+                  {when ? ` · ${when}` : ""}
                 </p>
-              )}
-            </div>
-            <div className="flex flex-col gap-2 md:w-[220px]">
-              <Button
-                type="button"
-                className="rounded-full bg-[#8c4a32] hover:bg-[#7a3f2a] text-white text-sm"
-                onClick={handlePdf}
-                disabled={copyPending}
-              >
-                Download brief (PDF)
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="rounded-full border-[#e0d5ca] text-sm"
-                onClick={() => onEmail("headliner")}
-              >
-                Email {input.headliner}
-              </Button>
-              {input.opener && (
+                {input.neighborhoods.length > 0 && (
+                  <p className="text-[12px] text-[#5c534d] mt-2">
+                    Posters: {input.neighborhoods.join(" · ")}
+                  </p>
+                )}
+                {copy ? (
+                  <ul className="mt-2.5 space-y-1 list-none">
+                    {copy.ideas.slice(0, 3).map((i) => (
+                      <li key={i.title} className="text-[13px] leading-snug">
+                        <span className="font-medium">{i.title}</span>
+                        {i.basis && (
+                          <span className="text-[#8c4a32] text-[12px]">
+                            {" "}
+                            · {i.basis}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p
+                    className="mt-2.5 text-[12px] italic text-[#8a7f76]"
+                    aria-busy={copyPending}
+                  >
+                    {copyPending
+                      ? "Drafting specials and posts…"
+                      : "Specials weren't available."}
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-col gap-2 md:w-[220px]">
                 <Button
                   type="button"
-                  variant="outline"
-                  className="rounded-full border-[#e0d5ca] text-sm"
-                  onClick={() => onEmail("opener")}
+                  className="rounded-full bg-[#8c4a32] hover:bg-[#7a3f2a] text-white text-sm"
+                  onClick={handlePdf}
+                  disabled={copyPending}
                 >
-                  Email {input.opener}
+                  Download brief (PDF)
                 </Button>
-              )}
-              <p className="text-[11px] text-[#8a7f76] leading-snug">
-                Lock the headliner first; they set the date and the fee. Then
-                the opener.
-              </p>
+              </div>
             </div>
+            <BookingTracker input={input} when={when} onEmail={onEmail} />
           </motion.div>
         )}
       </AnimatePresence>

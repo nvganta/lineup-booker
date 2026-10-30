@@ -135,8 +135,20 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-export function MarketingView({ state, pitch, venue, cityLabel, street, leadWith, defaultWhen }: Props) {
+export function MarketingView({
+  state,
+  pitch,
+  venue,
+  cityLabel,
+  street,
+  leadWith,
+  defaultWhen,
+}: Props) {
   const [when, setWhen] = useState(defaultWhen ?? "");
+  // The owner's own words for the poster, starting from what the run knows.
+  const [name, setName] = useState(() => venueDisplayName(pitch.venueLabel));
+  const [tagline, setTagline] = useState("Live");
+  const [where, setWhere] = useState(street || pitch.address);
   const [full, setFull] = useState(false);
   const posterRef = useRef<HTMLDivElement>(null);
 
@@ -179,14 +191,20 @@ export function MarketingView({ state, pitch, venue, cityLabel, street, leadWith
   ].slice(0, 6);
 
   return (
-    <article className={cn(POSTER_ARTICLE_CLASS, "max-w-none")} data-tab-panel="marketing">
+    <article
+      className={cn(POSTER_ARTICLE_CLASS, "max-w-none")}
+      data-tab-panel="marketing"
+    >
       <TabSection>
         <SectionLabel>Where the fans live</SectionLabel>
         {hoods.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-4 items-stretch">
             {venue ? (
               <LineupMap
-                lineup={{ venue: { ...venue, city: "Venue" }, neighborhoods: hoods }}
+                lineup={{
+                  venue: { ...venue, city: "Venue" },
+                  neighborhoods: hoods,
+                }}
                 className="h-[260px] relative z-0"
               />
             ) : (
@@ -194,9 +212,15 @@ export function MarketingView({ state, pitch, venue, cityLabel, street, leadWith
                 No map for this run.
               </div>
             )}
-            <ol className="list-none flex flex-col justify-center gap-1.5" data-hood-row>
+            <ol
+              className="list-none flex flex-col justify-center gap-1.5"
+              data-hood-row
+            >
               {hoods.map((n) => (
-                <li key={n.rank} className="flex items-baseline gap-2.5 text-[14px] leading-tight">
+                <li
+                  key={n.rank}
+                  className="flex items-baseline gap-2.5 text-[14px] leading-tight"
+                >
                   <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[#8c4a32] text-[11px] font-semibold text-[#faf7f2]">
                     {n.rank}
                   </span>
@@ -205,7 +229,9 @@ export function MarketingView({ state, pitch, venue, cityLabel, street, leadWith
                   </span>
                   {n.km != null && (
                     <span className="ml-auto shrink-0 text-[11px] tabular-nums text-[#8a7f76]">
-                      {n.km < 1 ? `${Math.round(n.km * 1000)} m` : `${n.km.toFixed(1)} km`}
+                      {n.km < 1
+                        ? `${Math.round(n.km * 1000)} m`
+                        : `${n.km.toFixed(1)} km`}
                     </span>
                   )}
                 </li>
@@ -216,7 +242,8 @@ export function MarketingView({ state, pitch, venue, cityLabel, street, leadWith
           <Muted>No neighbourhood data for this run.</Muted>
         )}
         <SourceNote className="mt-2.5">
-          Ranked by Qloo&apos;s fan heatmap for {pitch.headliner.name}, within 5 km. Put posters here first.
+          Ranked by Qloo&apos;s fan heatmap for {pitch.headliner.name}, within 5
+          km. Put posters here first.
         </SourceNote>
       </TabSection>
 
@@ -228,9 +255,13 @@ export function MarketingView({ state, pitch, venue, cityLabel, street, leadWith
           <ul className="list-none grid grid-cols-1 sm:grid-cols-3 gap-x-[18px]">
             {spots.map((s) => (
               <li key={s.id} className="py-[5px] border-t border-[#e8dfd6]">
-                <p className="font-heading text-[15px] leading-[1.15]">{s.name}</p>
+                <p className="font-heading text-[15px] leading-[1.15]">
+                  {s.name}
+                </p>
                 <p className="text-[12px] leading-[1.35] text-[#5c534d]">
-                  {[s.street, s.kinds.slice(0, 2).join(", ").toLowerCase()].filter(Boolean).join(" · ")}
+                  {[s.street, s.kinds.slice(0, 2).join(", ").toLowerCase()]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </p>
               </li>
             ))}
@@ -240,7 +271,8 @@ export function MarketingView({ state, pitch, venue, cityLabel, street, leadWith
         )}
         {spots.length >= 3 && (
           <SourceNote className="mt-2">
-            Places {pitch.headliner.name} fans go, within 1.5 km of {street || "the venue"}.
+            Places {pitch.headliner.name} fans go, within 1.5 km of{" "}
+            {street || "the venue"}.
           </SourceNote>
         )}
       </TabSection>
@@ -263,9 +295,10 @@ export function MarketingView({ state, pitch, venue, cityLabel, street, leadWith
                 ref={posterRef}
                 headliner={pitch.headliner}
                 opener={pitch.opener?.name ?? null}
-                venueLabel={venueDisplayName(pitch.venueLabel)}
-                address={street || pitch.address}
+                venueLabel={name}
+                address={where}
                 when={when}
+                tagline={tagline}
               />
               <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-[#1a1614]/70 px-2 py-1 text-[10.5px] text-[#faf7f2] opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
                 <Maximize2 className="size-3" strokeWidth={2} />
@@ -280,19 +313,44 @@ export function MarketingView({ state, pitch, venue, cityLabel, street, leadWith
               <ShowPoster
                 headliner={pitch.headliner}
                 opener={pitch.opener?.name ?? null}
-                venueLabel={venueDisplayName(pitch.venueLabel)}
-                address={street || pitch.address}
+                venueLabel={name}
+                address={where}
                 when={when}
+                tagline={tagline}
               />
             </PosterLightbox>
-            <input
-              value={when}
-              onChange={(e) => setWhen(e.target.value)}
-              placeholder="Date and time, e.g. Fri 14 Nov · 8 PM"
-              aria-label="Date and time for the poster"
-              className="mt-2.5 h-9 w-full rounded-md border border-[#e8dfd6] bg-[#fcf9f5] px-3 text-[13px] outline-none placeholder:text-[#9a8f85] focus:border-[#8c4a32]/50"
-              data-poster-when
-            />
+            <div className="mt-2.5 space-y-1.5" data-poster-edit>
+              <p className="text-[11px] text-[#8a7f76]">Make it yours</p>
+              {(
+                [
+                  ["Venue name", name, setName, "data-poster-name"],
+                  [
+                    "Top line, e.g. Live · Free entry",
+                    tagline,
+                    setTagline,
+                    "data-poster-tagline",
+                  ],
+                  [
+                    "Date and time, e.g. Fri 14 Nov · 8 PM",
+                    when,
+                    setWhen,
+                    "data-poster-when",
+                  ],
+                  ["Address", where, setWhere, "data-poster-address"],
+                ] as const
+              ).map(([label, value, set, attr]) => (
+                <input
+                  key={attr}
+                  value={value}
+                  onChange={(e) => set(e.target.value)}
+                  placeholder={label}
+                  aria-label={label}
+                  maxLength={60}
+                  className="h-9 w-full rounded-md border border-[#e8dfd6] bg-[#fcf9f5] px-3 text-[13px] outline-none placeholder:text-[#9a8f85] focus:border-[#8c4a32]/50"
+                  {...{ [attr]: true }}
+                />
+              ))}
+            </div>
             <Button
               type="button"
               variant="outline"
@@ -334,14 +392,19 @@ export function MarketingView({ state, pitch, venue, cityLabel, street, leadWith
                 ))}
               </ul>
             ) : copyState?.status === "loading" ? (
-              <p className="text-[13px] text-[#8a7f76] italic" aria-busy="true" data-drafting>
+              <p
+                className="text-[13px] text-[#8a7f76] italic"
+                aria-busy="true"
+                data-drafting
+              >
                 Drafting posts…
               </p>
             ) : (
               <Muted>Drafting didn&apos;t finish, so no posts are shown.</Muted>
             )}
             <SourceNote className="mt-3">
-              Fill in the date, download the poster, paste a post. Check the words before they go out.
+              Fill in the date, download the poster, paste a post. Check the
+              words before they go out.
             </SourceNote>
           </div>
         </div>
