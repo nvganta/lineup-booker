@@ -28,7 +28,7 @@ export const SCOUT_STAGES: Stage[] = [
   { id: "pitch", title: "Writing up the night", kinds: ["pitch", "quick"] },
 ];
 
-type StageState = "pending" | "active" | "done";
+export type StageState = "pending" | "active" | "done";
 
 function stageView(stage: Stage, steps: StepDataPart[]) {
   const mine = steps.filter((s) => stage.kinds.includes(s.kind) && !(s.kind === "pitch" && s.status === "fail"));
@@ -79,7 +79,7 @@ function useElapsed(running: boolean): number {
 }
 
 /** Title text with a slow light passing through it while the step is being worked on. */
-function Shimmer({ children }: { children: string }) {
+export function Shimmer({ children }: { children: string }) {
   return (
     <motion.span
       className="bg-clip-text text-transparent bg-[length:250%_100%] bg-[linear-gradient(90deg,#1a1614_0%,#1a1614_40%,#c9a593_50%,#1a1614_60%,#1a1614_100%)]"
@@ -92,7 +92,7 @@ function Shimmer({ children }: { children: string }) {
   );
 }
 
-function Marker({ state, weak }: { state: StageState; weak: boolean }) {
+export function Marker({ state, weak }: { state: StageState; weak: boolean }) {
   if (state === "done") {
     return (
       <motion.span
