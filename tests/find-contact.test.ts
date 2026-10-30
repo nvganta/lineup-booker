@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contactPageLinks, extractEmails, isForTheAct } from "@/lib/book/find-contact";
+import { contactPageLinks, extractEmails, isForTheAct, socialLinks } from "@/lib/book/find-contact";
 import { dmText } from "@/components/reach-map";
 
 const site = "https://someact.com/";
@@ -25,6 +25,22 @@ describe("finding how to reach an act", () => {
     expect(isForTheAct({ ...label, source: "https://someact.com/contact" }, site)).toBe(true);
     expect(isForTheAct({ ...label, address: "hi@someact.com" }, site)).toBe(true);
     expect(isForTheAct({ ...label, kind: "booking" }, site)).toBe(true);
+  });
+
+  it("takes the act's own profiles from its homepage, not share buttons or posts", () => {
+    const html = `
+      <a href="https://www.facebook.com/sharer/sharer.php?u=x">Share</a>
+      <a href="https://www.instagram.com/p/Cabc123/">A post</a>
+      <a href="https://www.instagram.com/someact/">IG</a>
+      <a href="https://twitter.com/intent/tweet?text=hi">Tweet</a>
+      <a href="https://x.com/someact">X</a>
+      <a href="https://www.facebook.com/SomeActMusic">FB</a>
+      <a href="https://www.instagram.com/someotherpage/">Second IG</a>`;
+    expect(socialLinks(html)).toEqual([
+      { label: "Instagram", url: "https://www.instagram.com/someact" },
+      { label: "X", url: "https://x.com/someact" },
+      { label: "Facebook", url: "https://www.facebook.com/SomeActMusic" },
+    ]);
   });
 
   it("finds contact pages on the same site only", () => {

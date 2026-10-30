@@ -55,7 +55,9 @@ function pickMbArtist(
   );
   const narrowed = hints?.country
     ? exact.filter(
-        (a) => !a.country || a.country.toLowerCase() === hints.country!.toLowerCase(),
+        (a) =>
+          !a.country ||
+          a.country.toLowerCase() === hints.country!.toLowerCase(),
       )
     : exact;
   // Several artists share this name and nothing tells them apart: say nothing
@@ -82,7 +84,11 @@ export async function researchFromMusicBrainz(
     if (!hit) return null;
 
     const origin = hit["begin-area"]?.name ?? hit.area?.name;
-    const kind = /person/i.test(hit.type ?? "") ? "person" : hit.type ? "group" : undefined;
+    const kind = /person/i.test(hit.type ?? "")
+      ? "person"
+      : hit.type
+        ? "group"
+        : undefined;
     // For a person MusicBrainz's life-span begin is a birth date, not a debut.
     const activeSince =
       kind === "group" ? hit["life-span"]?.begin?.slice(0, 4) : undefined;
@@ -155,7 +161,8 @@ type MbUrlRelation = {
   url?: { resource?: string };
 };
 
-const LINK_TYPES = /official homepage|social network|bandcamp|booking|management|soundcloud/i;
+const LINK_TYPES =
+  /official homepage|social network|bandcamp|booking|management|soundcloud/i;
 
 const HOST_LABELS: Array<[RegExp, string]> = [
   [/instagram\.com/, "Instagram"],
@@ -168,7 +175,13 @@ const HOST_LABELS: Array<[RegExp, string]> = [
 ];
 
 /** Where a booking enquiry is most likely to be read. */
-const LABEL_RANK: Record<string, number> = { Website: 1, Instagram: 2, Facebook: 3, Bandcamp: 4, X: 5 };
+const LABEL_RANK: Record<string, number> = {
+  Website: 1,
+  Instagram: 2,
+  Facebook: 3,
+  Bandcamp: 4,
+  X: 5,
+};
 
 /** Where an owner can reach the act, from MusicBrainz's link list. Website and booking first. */
 export function actLinksFromRelations(relations: MbUrlRelation[]): ActLink[] {
@@ -181,7 +194,9 @@ export function actLinksFromRelations(relations: MbUrlRelation[]): ActLink[] {
     const host = url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0]!;
     const byHost = HOST_LABELS.find(([re]) => re.test(host))?.[1];
     const booking = /booking|management/i.test(r.type ?? "");
-    const label = booking ? "Booking" : byHost ?? (/homepage/i.test(r.type ?? "") ? "Website" : host);
+    const label = booking
+      ? "Booking"
+      : (byHost ?? (/homepage/i.test(r.type ?? "") ? "Website" : host));
     if (seen.has(label)) continue;
     seen.add(label);
     out.push({ label, url, rank: booking ? 0 : (LABEL_RANK[label] ?? 6) });
@@ -197,27 +212,43 @@ export function actLinksFromRelations(relations: MbUrlRelation[]): ActLink[] {
  * when there is one; otherwise searches by name and keeps only a single exact
  * match, so another act's socials never show up.
  */
+/**
+ * The act's links from MusicBrainz: [] when it has none listed, null when
+ * MusicBrainz couldn't be read. It rate-limits shared server IPs, so a busy
+ * answer gets one retry, and a failure must never be remembered as "no links".
+ */
 export async function musicBrainzActLinks(
   artistName: string,
   mbid?: string,
   signal?: AbortSignal,
-): Promise<ActLink[]> {
+): Promise<ActLink[] | null> {
   return scheduleMusicBrainz(async () => {
     const fetch = getResearchFetch();
     const headers = { "User-Agent": USER_AGENT, Accept: "application/json" };
+    const getJson = async <T>(url: string): Promise<T | null> => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const res = await fetch(url, { headers, signal });
+        if (res.ok) return (await res.json()) as T;
+        if (res.status !== 503 && res.status !== 429) return null;
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+      return null;
+    };
     let id = mbid;
     if (!id) {
       const q = encodeURIComponent(`artist:"${artistName}"`);
-      const res = await fetch(`https://musicbrainz.org/ws/2/artist/?query=${q}&fmt=json&limit=8`, { headers, signal });
-      if (!res.ok) return [];
-      const hit = pickMbArtist(((await res.json()) as MbSearchResponse).artists ?? [], artistName);
+      const found = await getJson<MbSearchResponse>(
+        `https://musicbrainz.org/ws/2/artist/?query=${q}&fmt=json&limit=8`,
+      );
+      if (!found) return null;
+      const hit = pickMbArtist(found.artists ?? [], artistName);
       if (!hit) return [];
       id = hit.id;
       await new Promise((r) => setTimeout(r, 1000));
     }
-    const res = await fetch(`https://musicbrainz.org/ws/2/artist/${id}?inc=url-rels&fmt=json`, { headers, signal });
-    if (!res.ok) return [];
-    const body = (await res.json()) as { relations?: MbUrlRelation[] };
-    return actLinksFromRelations(body.relations ?? []);
+    const body = await getJson<{ relations?: MbUrlRelation[] }>(
+      `https://musicbrainz.org/ws/2/artist/${id}?inc=url-rels&fmt=json`,
+    );
+    return body ? actLinksFromRelations(body.relations ?? []) : null;
   });
 }
