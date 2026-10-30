@@ -43,6 +43,22 @@ export async function runScoutSetup(tools: ToolSet, input: LineupRequest): Promi
 }
 
 /**
+ * The opener, map and crowd pass the model was meant to call next. Free
+ * models sometimes end their turn right after the headliner; running it here
+ * turns that into a full night instead of Quick mode.
+ */
+export async function runScoutExtras(tools: ToolSet, input: LineupRequest): Promise<void> {
+  await tools.scout_after_headliner!.execute!(
+    {
+      concept: input.concept,
+      address: input.location,
+      why: "The headliner is set; find the opener, the fans' neighborhoods and the crowd.",
+    },
+    SETUP_OPTIONS,
+  );
+}
+
+/**
  * What the scout already knows, for the model's prompt. Rebuilt for each
  * model attempt, so a fallback model picks up where a stalled one stopped.
  */

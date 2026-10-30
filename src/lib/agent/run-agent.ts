@@ -19,7 +19,7 @@ import {
 import { withQlooReceipts } from "@/lib/qloo/receipts";
 import { createStreamWriter } from "./stream-writer";
 import { buildAgentTools } from "./tools";
-import { regularsPhrases, runScoutSetup, scoutBrief } from "./scout-setup";
+import { regularsPhrases, runScoutExtras, runScoutSetup, scoutBrief } from "./scout-setup";
 import { AGENT_SYSTEM_PROMPT, agentUserPrompt } from "./system-prompt";
 import { runQuickMode } from "./quick-mode";
 import { salvagePitch } from "./salvage-pitch";
@@ -66,6 +66,14 @@ async function finishAgentRun(
       quickMode: false,
     });
     return;
+  }
+
+  // The model stopped after the headliner with time left: finish the scout in code.
+  const s = runtime.session;
+  if (s.headlinerEntity && !s.extrasScouted && !runtime.budget.pastSoftLimit()) {
+    await runScoutExtras(buildAgentTools(), input).catch((err) =>
+      console.error("[agent] scout extras in code failed", err),
+    );
   }
 
   await flushArtistResearch(runtime.session, RESEARCH_TOTAL_MS);
