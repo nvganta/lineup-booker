@@ -7,34 +7,58 @@ import { ArrowUpRight } from "lucide-react";
 import { useEffect, useState } from "react";
 
 const reachMemo = new Map<string, ActReach>();
+// The sources (MusicBrainz above all) sometimes turn a busy server away, so
+// an empty answer gets two more tries before the search fallback shows.
+const RETRY_MS = [1500, 3000];
 
-/** How to reach an act, looked up once per act. */
+const isEmpty = (r: ActReach) =>
+  r.links.length === 0 && r.emails.length === 0 && !r.contactPage;
+
+async function lookUp(name: string, mbid?: string): Promise<ActReach> {
+  const q = new URLSearchParams({ name, ...(mbid ? { mbid } : {}) });
+  try {
+    const r = await fetch(`/api/act-links?${q}`, { cache: "no-store" });
+    const j = (r.ok ? await r.json() : {}) as Partial<ActReach>;
+    return {
+      links: j.links ?? [],
+      emails: j.emails ?? [],
+      contactPage: j.contactPage,
+    };
+  } catch {
+    return { links: [], emails: [] };
+  }
+}
+
+/**
+ * How to reach an act. A found answer is kept for the visit; an empty one
+ * is retried, and isn't kept, so opening the act again asks again.
+ */
 export function useActReach(name: string, mbid?: string): ActReach | undefined {
   const key = `${name}|${mbid ?? ""}`;
-  const [, bump] = useState(0);
+  const [settled, setSettled] = useState<{
+    key: string;
+    reach: ActReach;
+  } | null>(null);
   useEffect(() => {
     if (reachMemo.has(key)) return;
     let live = true;
-    const q = new URLSearchParams({ name, ...(mbid ? { mbid } : {}) });
-    fetch(`/api/act-links?${q}`)
-      .then((r) => (r.ok ? r.json() : {}))
-      .then((j: Partial<ActReach>) => {
-        reachMemo.set(key, {
-          links: j.links ?? [],
-          emails: j.emails ?? [],
-          contactPage: j.contactPage,
-        });
-        if (live) bump((n) => n + 1);
-      })
-      .catch(() => {
-        reachMemo.set(key, { links: [], emails: [] });
-        if (live) bump((n) => n + 1);
-      });
+    (async () => {
+      let reach = await lookUp(name, mbid);
+      for (const wait of RETRY_MS) {
+        if (!isEmpty(reach) || !live) break;
+        await new Promise((r) => setTimeout(r, wait));
+        reach = await lookUp(name, mbid);
+      }
+      if (!isEmpty(reach)) reachMemo.set(key, reach);
+      if (live) setSettled({ key, reach });
+    })();
     return () => {
       live = false;
     };
   }, [key, name, mbid]);
-  return reachMemo.get(key);
+  return (
+    reachMemo.get(key) ?? (settled?.key === key ? settled.reach : undefined)
+  );
 }
 
 export function useCopy(): [string | null, (id: string, text: string) => void] {
