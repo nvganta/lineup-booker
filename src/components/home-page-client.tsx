@@ -33,6 +33,7 @@ import {
   type StoredLineup,
 } from "@/lib/stored-lineups";
 import { cn } from "@/lib/utils";
+import { ChevronLeft } from "lucide-react";
 import { MotionConfig } from "motion/react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
@@ -258,11 +259,7 @@ export function HomePageClient() {
           sections={shownPitch && !loading ? [...PAGE_SECTIONS] : []}
           activeSection={activeSection}
           onJump={jumpToSection}
-          sidebar={
-            showLanding
-              ? undefined
-              : { open: sidebarOpen, onToggle: () => setSidebarOpen((o) => !o) }
-          }
+          sidebarOpen={!showLanding && sidebarOpen}
         />
         <HowItWorksDialog open={howOpen} onClose={() => setHowOpen(false)} />
 
@@ -281,9 +278,33 @@ export function HomePageClient() {
         ) : (
           <>
             <div className="relative z-10 flex flex-col lg:flex-row flex-1 min-h-0 max-lg:overflow-visible">
-              <div className="flex flex-col lg:flex-row flex-1 min-h-0 max-lg:overflow-visible">
-                {/* Collapses to nothing from the header toggle; the inner column
-                    keeps its width so the text is clipped, not squeezed, as it slides. */}
+              <div className="relative flex flex-col lg:flex-row flex-1 min-h-0 max-lg:overflow-visible">
+                {/* Sits on the divider and rides it as the sidebar slides; parks at the window edge when closed. */}
+                <button
+                  type="button"
+                  onClick={() => setSidebarOpen((o) => !o)}
+                  aria-label={
+                    sidebarOpen ? "Hide venue details" : "Show venue details"
+                  }
+                  aria-expanded={sidebarOpen}
+                  title={
+                    sidebarOpen ? "Hide venue details" : "Show venue details"
+                  }
+                  className={cn(
+                    "max-lg:hidden absolute top-5 z-30 -translate-x-1/2 flex size-7 items-center justify-center rounded-full border border-[#e0d5ca] bg-[#fcf9f5] text-[#8a7f76] shadow-[0_1px_3px_rgba(26,22,20,0.12)] hover:text-[#8c4a32] hover:border-[#8c4a32]/40 cursor-pointer",
+                    "transition-[left,color,border-color] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]",
+                    sidebarOpen ? "left-[20rem] xl:left-[22rem]" : "left-4",
+                  )}
+                >
+                  <ChevronLeft
+                    className={cn(
+                      "size-4 transition-transform duration-300",
+                      !sidebarOpen && "rotate-180",
+                    )}
+                    strokeWidth={2}
+                  />
+                </button>
+                {/* The inner column keeps its width, so the text is clipped, not squeezed, as it slides. */}
                 <div
                   className={cn(
                     "shrink-0 w-full lg:overflow-hidden lg:transition-[width,border-color] lg:duration-300 lg:ease-[cubic-bezier(0.23,1,0.32,1)] lg:border-r border-[#e8dfd6] bg-[#faf7f2]/95",

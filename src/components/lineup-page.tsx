@@ -177,7 +177,7 @@ function ActCard({
   const [photoOk, setPhotoOk] = useState(Boolean(photo));
   return (
     <article
-      className={cn(CARD, "flex flex-col overflow-hidden")}
+      className={cn(CARD, "flex w-full flex-col overflow-hidden")}
       data-act-card={slot.toLowerCase()}
     >
       <div className="relative aspect-[16/10] bg-[#ebe3d9]">
@@ -627,7 +627,10 @@ export function LineupPage({
                   className="inline-flex items-center gap-1.5 rounded-full border border-[#e0d5ca] bg-[#fcf9f5] px-3 py-1.5 text-[12px] leading-none text-[#5c534d] hover:text-[#8c4a32] hover:border-[#8c4a32]/40 transition-colors cursor-pointer"
                   data-qloo-count
                 >
-                  <span className="size-1.5 rounded-full bg-[#8c4a32]" aria-hidden />
+                  <span
+                    className="size-1.5 rounded-full bg-[#8c4a32]"
+                    aria-hidden
+                  />
                   {qlooCallCount} Qloo lookups
                 </button>
               )}
