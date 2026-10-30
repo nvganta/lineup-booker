@@ -83,7 +83,7 @@ export function LandingHero({
   return (
     <div className="flex-1 overflow-y-auto" data-landing>
       <section className="mx-auto w-full max-w-[1400px] px-6 lg:px-12 pt-10 lg:pt-14 pb-8">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_0.95fr] gap-10 lg:gap-14 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_0.95fr] gap-10 lg:gap-14 items-start">
           <div>
             {/* Two lines, each kept whole; the size follows the column so the longer one never wraps. */}
             <h1 className="font-display text-[#1a1614] text-[clamp(2rem,4.1vw,3.9rem)] leading-[1.05]">
