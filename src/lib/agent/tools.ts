@@ -924,11 +924,10 @@ export function buildAgentTools(): ToolSet {
 
     compose_pitch: tool({
       description:
-        "Final pitch: pick why-lines from catalog slot ids returned in the tool result; moodLine is the only free sentence.",
+        "Final pitch: pick why-lines from catalog slot ids returned in the tool result. The mood line is written in code from the matched tags.",
       inputSchema: whySchema.extend({
         venueLabel: z.string(),
         address: z.string(),
-        moodLine: z.string().max(160),
         // Fixed ids in the schema so the model can't guess one that doesn't
         // exist (a free string cost a compose retry on most runs).
         headlinerWhySlot: z
@@ -946,7 +945,6 @@ export function buildAgentTools(): ToolSet {
       execute: async ({
         venueLabel,
         address,
-        moodLine,
         headlinerWhySlot,
         openerWhySlot,
         widenRoomNote,
@@ -1038,7 +1036,9 @@ export function buildAgentTools(): ToolSet {
           venueLabel:
             typedConcept && typedConcept.length <= 80 ? typedConcept : venueLabel,
           address,
-          moodLine,
+          // Written from the tags Qloo matched, never by the model: a free
+          // sentence copied the prompt example ("indie folk") onto rock rooms.
+          moodLine: fallbackMoodLine(session),
           headlinerWhy,
           openerWhy: openerWhyResolved,
           crowdDemographics: session.crowdDemographics ?? null,
@@ -1067,20 +1067,7 @@ export function buildAgentTools(): ToolSet {
           ...session.tagLabels,
           ...session.tagLabels.flatMap((l) => l.split(/\s*-\s*/)),
         ];
-        let validation = validatePitchPayload(pitch, verifiedPlaces);
-        let moodLineReplaced = false;
-        if (!validation.ok) {
-          // moodLine is the only free sentence; the why-lines come from the
-          // catalog. If swapping in the plain mood line passes, keep the
-          // model's picks instead of spending a step (or ending in salvage).
-          const plain = { ...pitch, moodLine: fallbackMoodLine(session) };
-          const second = validatePitchPayload(plain, verifiedPlaces);
-          if (second.ok) {
-            pitch = plain;
-            validation = second;
-            moodLineReplaced = true;
-          }
-        }
+        const validation = validatePitchPayload(pitch, verifiedPlaces);
         if (!validation.ok) {
           session.pitchValidationAttempts =
             (session.pitchValidationAttempts ?? 0) + 1;
@@ -1105,8 +1092,8 @@ export function buildAgentTools(): ToolSet {
         session.pitch = pitch;
         rt().writer.writePitch(pitch);
         stepEnd(id, t0, "pitch", why, {
-          level: moodLineReplaced ? "weak" : "good",
-          reasons: moodLineReplaced ? ["mood_line_replaced"] : [],
+          level: "good",
+          reasons: [],
         });
         return {
           verdict: { level: "good", reasons: [] },

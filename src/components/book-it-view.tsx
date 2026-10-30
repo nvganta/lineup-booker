@@ -6,6 +6,7 @@ import type { VenueInsightsState } from "@/hooks/use-venue-insights";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DraftedBadge, SectionLabel } from "@/components/venue-tab-parts";
+import { mailtoFor, ReachMap, useActReach, useCopy } from "@/components/reach-map";
 import { X } from "lucide-react";
 
 const memo = new Map<string, BookingEmail>();
@@ -56,31 +57,22 @@ function PanelHead({ label, badge, onClose }: { label: React.ReactNode; badge?: 
 export function BookingEmailCard({
   input,
   actLabel,
+  mbid,
   onClose,
   className,
 }: {
   input: BookingInput;
   actLabel: string;
+  /** MusicBrainz id from the act's background, when the card has one. */
+  mbid?: string;
   onClose: () => void;
   className?: string;
 }) {
   const { email, failed } = useBookingEmail(input);
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    if (!email) return;
-    try {
-      await navigator.clipboard.writeText(`Subject: ${email.subject}\n\n${email.body}`);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1600);
-    } catch {
-      /* ignore */
-    }
-  };
-
-  const mailto = email
-    ? `mailto:?subject=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.body)}`
-    : undefined;
+  const reach = useActReach(actLabel, mbid);
+  const [copied, copy] = useCopy();
+  // The best address we found goes straight into the To field.
+  const to = reach?.emails[0]?.address;
 
   return (
     <article className={cn(PANEL, className)} data-book="email">
@@ -91,19 +83,39 @@ export function BookingEmailCard({
       />
       {email ? (
         <div className="px-5 py-3">
+          {to && (
+            <p className="mb-1.5 text-[12px] text-[#6b5c52]">
+              To: <span className="text-[#1a1614]">{to}</span>
+            </p>
+          )}
           <p className="font-heading text-[16px] leading-snug">{email.subject}</p>
           <p className="mt-2 whitespace-pre-line text-[13px] leading-[1.55] text-[#3d3530]">{email.body}</p>
           <div className="flex flex-wrap gap-2.5 mt-3.5">
-            <Button type="button" variant="outline" className="rounded-full border-[#e0d5ca] text-sm" onClick={handleCopy}>
-              {copied ? "Copied" : "Copy email"}
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-full border-[#e0d5ca] text-sm"
+              onClick={() => copy("email", `Subject: ${email.subject}\n\n${email.body}`)}
+            >
+              {copied === "email" ? "Copied" : "Copy email"}
             </Button>
-            <a href={mailto} className="inline-flex items-center rounded-full bg-[#8c4a32] px-4 h-9 text-sm text-[#faf7f2] hover:bg-[#7a4030]">
+            <a
+              href={mailtoFor(to ?? "", email)}
+              className="inline-flex items-center rounded-full bg-[#8c4a32] px-4 h-9 text-sm text-[#faf7f2] hover:bg-[#7a4030]"
+            >
               Open in mail
             </a>
           </div>
           <p className="mt-3 text-[11px] text-[#8a7f76]">
-            Fill in [date], [offer] and [owner name] before it goes. Their booking contact is usually on their site or socials.
+            Fill in [date], [offer] and [owner name] before it goes.
           </p>
+          {reach ? (
+            <ReachMap actLabel={actLabel} input={input} email={email} reach={reach} />
+          ) : (
+            <p className="mt-4 border-t border-[#e8dfd6] pt-3 text-[12px] italic text-[#8a7f76]" aria-busy="true">
+              Finding how to reach {actLabel}…
+            </p>
+          )}
         </div>
       ) : (
         <p className="px-5 py-6 text-[13px] italic text-[#8a7f76]" aria-busy={!failed}>

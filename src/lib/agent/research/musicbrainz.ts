@@ -146,3 +146,78 @@ export function resetMusicBrainzRateLimit(): void {
   lastMbAt = 0;
   mbChain = Promise.resolve();
 }
+
+export type ActLink = { label: string; url: string };
+
+type MbUrlRelation = {
+  type?: string;
+  ended?: boolean;
+  url?: { resource?: string };
+};
+
+const LINK_TYPES = /official homepage|social network|bandcamp|booking|management|soundcloud/i;
+
+const HOST_LABELS: Array<[RegExp, string]> = [
+  [/instagram\.com/, "Instagram"],
+  [/facebook\.com/, "Facebook"],
+  [/(twitter|x)\.com/, "X"],
+  [/tiktok\.com/, "TikTok"],
+  [/bandcamp\.com/, "Bandcamp"],
+  [/soundcloud\.com/, "SoundCloud"],
+  [/youtube\.com/, "YouTube"],
+];
+
+/** Where a booking enquiry is most likely to be read. */
+const LABEL_RANK: Record<string, number> = { Website: 1, Instagram: 2, Facebook: 3, Bandcamp: 4, X: 5 };
+
+/** Where an owner can reach the act, from MusicBrainz's link list. Website and booking first. */
+export function actLinksFromRelations(relations: MbUrlRelation[]): ActLink[] {
+  const out: Array<ActLink & { rank: number }> = [];
+  const seen = new Set<string>();
+  for (const r of relations) {
+    const url = r.url?.resource;
+    if (!url || r.ended || !LINK_TYPES.test(r.type ?? "")) continue;
+    if (!/^https?:\/\//.test(url)) continue;
+    const host = url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0]!;
+    const byHost = HOST_LABELS.find(([re]) => re.test(host))?.[1];
+    const booking = /booking|management/i.test(r.type ?? "");
+    const label = booking ? "Booking" : byHost ?? (/homepage/i.test(r.type ?? "") ? "Website" : host);
+    if (seen.has(label)) continue;
+    seen.add(label);
+    out.push({ label, url, rank: booking ? 0 : (LABEL_RANK[label] ?? 6) });
+  }
+  return out
+    .sort((a, b) => a.rank - b.rank)
+    .slice(0, 4)
+    .map(({ label, url }) => ({ label, url }));
+}
+
+/**
+ * The act's own links. Uses the MusicBrainz id from the card's background
+ * when there is one; otherwise searches by name and keeps only a single exact
+ * match, so another act's socials never show up.
+ */
+export async function musicBrainzActLinks(
+  artistName: string,
+  mbid?: string,
+  signal?: AbortSignal,
+): Promise<ActLink[]> {
+  return scheduleMusicBrainz(async () => {
+    const fetch = getResearchFetch();
+    const headers = { "User-Agent": USER_AGENT, Accept: "application/json" };
+    let id = mbid;
+    if (!id) {
+      const q = encodeURIComponent(`artist:"${artistName}"`);
+      const res = await fetch(`https://musicbrainz.org/ws/2/artist/?query=${q}&fmt=json&limit=8`, { headers, signal });
+      if (!res.ok) return [];
+      const hit = pickMbArtist(((await res.json()) as MbSearchResponse).artists ?? [], artistName);
+      if (!hit) return [];
+      id = hit.id;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    const res = await fetch(`https://musicbrainz.org/ws/2/artist/${id}?inc=url-rels&fmt=json`, { headers, signal });
+    if (!res.ok) return [];
+    const body = (await res.json()) as { relations?: MbUrlRelation[] };
+    return actLinksFromRelations(body.relations ?? []);
+  });
+}

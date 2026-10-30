@@ -11,7 +11,7 @@ Rules:
 - Never invent artist names, neighborhoods, numbers, or ticket forecasts.
 - Artist bios (origin, active since, releases) load in parallel after the headliner — compose_pitch returns artistBackgrounds when ready. You may use those public facts in the pitch; do not call research_artists unless compose_pitch says backgrounds are missing.
 - Finish with compose_pitch only when headliner and neighborhoods exist when possible.
-- compose_pitch: write moodLine yourself — one short line about the night and the room only (e.g. "An indie folk night sized for your room."). No praise or descriptive adjectives about artists (avoid words like amazing, legendary, iconic, beloved). For headlinerWhy and openerWhy, pass headlinerWhySlot and openerWhySlot from the catalog — do not invent copy, birthplaces, or song titles.
+- compose_pitch: the mood line is written in code from the matched tags. For headlinerWhy and openerWhy, pass headlinerWhySlot and openerWhySlot from the catalog — do not invent copy, birthplaces, or song titles.
 - Do not write crowd demographics in the pitch; the UI renders crowd from structured data.`;
 
 export function agentUserPrompt(input: {

@@ -7,10 +7,7 @@ import { LineupForm } from "@/components/lineup-form";
 import { PAGE_SECTIONS } from "@/components/lineup-page";
 import { LineupResultPane } from "@/components/lineup-result-pane";
 import { VenueSummary } from "@/components/venue-summary";
-import {
-  RecentRailDesktop,
-  RecentRailMobile,
-} from "@/components/lineup-sample-rail";
+import { RecentLineups } from "@/components/lineup-sample-rail";
 import {
   consumeAgentStream,
   type AgentStreamState,
@@ -267,13 +264,9 @@ export function HomePageClient() {
           </div>
         ) : (
           <>
-            <RecentRailMobile {...railProps} />
-
             <div className="relative z-10 flex flex-col lg:flex-row flex-1 min-h-0 max-lg:overflow-visible">
-              <RecentRailDesktop {...railProps} />
-
               <div className="flex flex-col lg:flex-row flex-1 min-h-0 max-lg:overflow-visible">
-                <div className="shrink-0 w-full lg:w-[20rem] xl:w-[22rem] lg:border-r border-[#e8dfd6] bg-[#faf7f2]/95 lg:overflow-hidden px-4 py-5 lg:px-5">
+                <div className="shrink-0 w-full lg:w-[20rem] xl:w-[22rem] lg:border-r border-[#e8dfd6] bg-[#faf7f2]/95 lg:overflow-y-auto lg:overscroll-contain px-4 py-5 lg:px-5">
                   {showSummary ? (
                     <VenueSummary
                       request={form}
@@ -313,6 +306,7 @@ export function HomePageClient() {
                         </li>
                       ))}
                     </ul>
+                    <RecentLineups {...railProps} />
                   </div>
                 </div>
 

@@ -17,6 +17,7 @@ const row = z.object({ label: z.string(), kind: z.enum(["drink", "food", "late",
 const body = z.object({
   headliner: z.string().min(1).max(80),
   opener: z.string().max(80).nullable(),
+  openFor: z.string().max(200).nullable().optional(),
   venueLabel: z.string().min(1).max(200),
   address: z.string().min(1).max(200),
   cityLabel: z.string().max(80),
@@ -35,7 +36,7 @@ export async function POST(req: Request) {
   const raw = JSON.stringify({ input, v: 1 });
   let h = 0;
   for (let i = 0; i < raw.length; i++) h = (h * 31 + raw.charCodeAt(i)) | 0;
-  const k = `book-it:v2:${(h >>> 0).toString(36)}:${raw.length}`;
+  const k = `book-it:v3:${(h >>> 0).toString(36)}:${raw.length}`;
   const store = getPersistentStore();
   const hit = await store.get<BookingEmail>(k);
   if (hit) return Response.json(hit);

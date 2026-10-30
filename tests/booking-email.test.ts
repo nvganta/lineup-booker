@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bookingProblems, parseBookingEmail, templateBookingEmail, type BookingInput } from "@/lib/book/booking-email";
+import { bookingPrompt, bookingProblems, parseBookingEmail, templateBookingEmail, type BookingInput } from "@/lib/book/booking-email";
 
 const input: BookingInput = {
   headliner: "The Paper Gulls",
@@ -32,6 +32,7 @@ describe("booking email checks", () => {
     ["an invented number", ok + "\nAbout 300 fans nearby."],
     ["an invented placeholder", ok.replace("Hello,", "Hello [venue name],")],
     ["a merged row", ok + "\nThe crowd loves late-night burgers."],
+    ["a guessed pronoun", ok.replace("We can offer", "His fans live nearby. We can offer")],
   ])("rejects %s", (_, body) => {
     expect(bookingProblems("Booking enquiry", body, input).length).toBeGreaterThan(0);
   });
@@ -44,5 +45,14 @@ describe("booking email checks", () => {
   it("the template passes its own checks", () => {
     const t = templateBookingEmail(input);
     expect(bookingProblems(t.subject, t.body, input)).toEqual([]);
+  });
+
+  it("asks the opener to open for the headliner, not to headline", () => {
+    const forOpener: BookingInput = { ...input, headliner: "Fern Static", opener: null, openFor: "The Paper Gulls" };
+    expect(bookingPrompt(forOpener)).toContain("We want Fern Static to open for The Paper Gulls");
+    expect(bookingPrompt(forOpener)).not.toContain("Headliner we want");
+    const t = templateBookingEmail(forOpener);
+    expect(t.body).toContain("Fern Static to open for The Paper Gulls");
+    expect(bookingProblems(t.subject, t.body, forOpener)).toEqual([]);
   });
 });

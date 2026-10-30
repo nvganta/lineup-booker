@@ -68,6 +68,14 @@ export const PAGE_SECTIONS = [
 const CARD =
   "rounded-md border border-[#e8dfd6] bg-[#f7f2eb] text-[#1a1614] shadow-[0_1px_0_rgba(26,22,20,0.06),0_20px_40px_-24px_rgba(26,22,20,0.18)]";
 
+/** The act's MusicBrainz id, when its background card came from there. */
+function musicBrainzId(
+  bg: { sourceName?: string; sourceUrl?: string } | undefined,
+): string | undefined {
+  if (bg?.sourceName !== "MusicBrainz") return undefined;
+  return bg.sourceUrl?.match(/\/artist\/([0-9a-f-]{36})/i)?.[1];
+}
+
 /** Later sections arrive one after another once the scout hands over the page. */
 function settleIn(on: boolean | undefined, order: number) {
   if (!on) return {};
@@ -303,6 +311,17 @@ export function LineupPage({
     "night" | "headliner" | "opener" | null
   >(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  // An email opens under the act cards, a screen below the brief that asks
+  // for it; bring it into view so the click visibly goes somewhere.
+  useEffect(() => {
+    if (booking !== "headliner" && booking !== "opener") return;
+    const t = setTimeout(() => {
+      rootRef.current
+        ?.querySelector("[data-book=email]")
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+    return () => clearTimeout(t);
+  }, [booking]);
   const analyticsInput = analyticsInputFromPitch(pitch);
   const analyticsState = usePitchAnalytics(analyticsInput, analyticsRev);
   const analytics =
@@ -716,12 +735,18 @@ export function LineupPage({
                           ? pitch.opener!.name
                           : pitch.headliner.name
                       }
+                      mbid={musicBrainzId(
+                        booking === "opener"
+                          ? pitch.opener?.background
+                          : pitch.headliner.background,
+                      )}
                       input={
                         booking === "opener"
                           ? {
                               ...bookingInput,
                               headliner: pitch.opener!.name,
                               opener: null,
+                              openFor: pitch.headliner.name,
                             }
                           : bookingInput
                       }

@@ -2,8 +2,11 @@ import { combinedRowProblems } from "@/lib/venue/drafted-copy";
 import type { TasteCountRow } from "@/lib/venue/place-insights";
 
 export type BookingInput = {
+  /** The act this email goes to. */
   headliner: string;
   opener: string | null;
+  /** Set when the email goes to the opener: the act they would open for. */
+  openFor?: string | null;
   venueLabel: string;
   address: string;
   cityLabel: string;
@@ -20,13 +23,18 @@ export function bookingPrompt(i: BookingInput): string {
   return [
     `Venue: ${i.venueLabel}, ${i.address}.`,
     `Music the regulars like: ${i.styleTags.join(", ") || "not given"}.`,
-    `Headliner we want: ${i.headliner}.`,
-    i.opener ? `Opener we would propose: ${i.opener} (not asked yet).` : "No opener chosen.",
-    `Neighbourhoods where ${i.headliner}'s listeners are: ${i.neighborhoods.slice(0, 3).join(", ") || "unknown"}.`,
+    i.openFor
+      ? `We want ${i.headliner} to open for ${i.openFor}, the headliner (not asked yet).`
+      : `Headliner we want: ${i.headliner}.`,
+    i.opener ? `Opener we would propose: ${i.opener} (not asked yet).` : i.openFor ? "" : "No opener chosen.",
+    `Neighbourhoods where ${i.openFor ?? i.headliner}'s listeners are: ${i.neighborhoods.slice(0, 3).join(", ") || "unknown"}.`,
     "",
     'Write JSON only: {"subject":"","body":""}',
     `A short booking enquiry from the venue owner to ${i.headliner}'s booking agent, under 110 words, sentence-case subject.`,
-    "Say who we are and the room, why him in one plain sentence, propose the opener, and ask for availability and terms.",
+    i.openFor
+      ? `Say who we are and the room, ask ${i.headliner} to open for ${i.openFor} and why the pairing fits in one plain sentence, and ask for availability and terms.`
+      : "Say who we are and the room, why this act fits in one plain sentence, propose the opener, and ask for availability and terms.",
+    "Refer to every act by name. Never use he, she, him, his, her or hers for an act.",
     "Use the placeholders [date], [offer] and [owner name] exactly as written, and no other bracketed placeholders. Name the venue as given. Do not invent fees, dates, numbers, history, email addresses or phone numbers.",
     "Do not quote percentiles, scores or overlaps. Never say the opener is confirmed or booked. No exclamation marks, no hashtags.",
   ].join("\n");
@@ -34,7 +42,7 @@ export function bookingPrompt(i: BookingInput): string {
 
 function allowedNumbers(i: BookingInput): Set<string> {
   const nums = new Set<string>();
-  for (const t of [i.venueLabel, i.address, i.headliner, i.opener ?? "", ...i.neighborhoods]) {
+  for (const t of [i.venueLabel, i.address, i.headliner, i.opener ?? "", i.openFor ?? "", ...i.neighborhoods]) {
     for (const m of t.match(/\d+/g) ?? []) nums.add(m);
   }
   return nums;
@@ -50,6 +58,8 @@ export function bookingProblems(subject: string, body: string, i: BookingInput):
   if (/@|https?:\/\/|www\./i.test(text)) p.push("contact");
   if (/\+?\d[\d\s().-]{7,}\d/.test(text)) p.push("phone");
   if (/!|#\w/.test(text)) p.push("exclamation or hashtag");
+  // We don't know an act's pronouns; a guessed one misgenders a real person.
+  if (/\b(he|she|him|his|her|hers)\b/i.test(text)) p.push("gendered pronoun");
   for (const ph of PLACEHOLDERS) if (!body.includes(ph)) p.push(`missing ${ph}`);
   for (const t of text.match(/\[[^\]]*\]/g) ?? []) {
     if (!(PLACEHOLDERS as readonly string[]).includes(t)) p.push(`unknown placeholder ${t}`);
@@ -88,8 +98,10 @@ export function templateBookingEmail(i: BookingInput): BookingEmail {
   const lines = [
     "Hello,",
     "",
-    `I run a ${i.venueLabel.charAt(0).toLowerCase()}${i.venueLabel.slice(1)} at ${i.address}. We'd like to book ${i.headliner} for a night on [date].`,
-    where ? `A lot of ${i.headliner}'s listeners live nearby, in ${where}.` : "",
+    i.openFor
+      ? `I run a ${i.venueLabel.charAt(0).toLowerCase()}${i.venueLabel.slice(1)} at ${i.address}. We'd like ${i.headliner} to open for ${i.openFor} on [date].`
+      : `I run a ${i.venueLabel.charAt(0).toLowerCase()}${i.venueLabel.slice(1)} at ${i.address}. We'd like to book ${i.headliner} for a night on [date].`,
+    where ? `A lot of ${i.openFor ?? i.headliner}'s listeners live nearby, in ${where}.` : "",
     i.opener ? `We'd propose ${i.opener} to open.` : "",
     "Could you share availability and terms? We can offer [offer].",
     "",
